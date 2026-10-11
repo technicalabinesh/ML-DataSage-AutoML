@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { Sparkles, Key, CheckCircle2, Bot, BrainCircuit, Wand2 } from 'lucide-react';
+import { 
+  Sparkles, 
+  Key, 
+  CheckCircle2, 
+  Bot, 
+  BrainCircuit, 
+  Wand2, 
+  Trash2, 
+  Database, 
+  RefreshCw,
+  ChevronDown
+} from 'lucide-react';
 
 const GEMINI_MODELS = [
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Fast & Balanced)' },
@@ -17,9 +28,13 @@ export default function Header({
   setSelectedModel,
   apiKey,
   setApiKey,
-  filename
+  filename,
+  availableDatasets = [],
+  onSwitchDataset,
+  onResetDataset
 }) {
   const [showKeyModal, setShowKeyModal] = useState(false);
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
   const [tempKey, setTempKey] = useState(apiKey);
 
   const steps = [
@@ -37,9 +52,17 @@ export default function Header({
     setShowKeyModal(false);
   };
 
+  const handleConfirmReset = () => {
+    setShowConfirmReset(false);
+    if (onResetDataset) {
+      onResetDataset();
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 backdrop-blur-2xl bg-[#070a12]/90 border-b border-white/10 px-6 py-4 shadow-2xl">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+        
         {/* Brand Logo & Title */}
         <div className="flex items-center gap-3.5 group cursor-pointer" onClick={() => setActiveStep(0)}>
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-lime-400 p-0.5 shadow-2xl shadow-indigo-500/40 group-hover:scale-105 transition-all">
@@ -54,20 +77,52 @@ export default function Header({
             </h1>
             <p className="text-xs text-gray-400 font-medium flex items-center gap-2">
               <span>Autonomous Data ETL & Predictive Intelligence</span>
-              {filename && (
-                <span className="pill-badge pill-purple text-[10px] py-0.5 px-2.5 shadow-md">
-                  📄 {filename}
-                </span>
-              )}
             </p>
           </div>
         </div>
 
-        {/* Gemini Model & API Key Configuration */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-white/15 rounded-full px-4 py-2 text-xs text-gray-300 shadow-lg hover:border-indigo-400 transition-all">
-            <Bot className="w-4 h-4 text-cyan-400 animate-bounce" />
-            <span className="hidden sm:inline font-bold">LLM:</span>
+        {/* Center / Right: Dataset Switcher, LLM, Reset Button, and API Key */}
+        <div className="flex flex-wrap items-center justify-end gap-2.5">
+          
+          {/* Active Dataset & Switcher */}
+          {filename && (
+            <div className="flex items-center gap-1.5 bg-slate-900/90 border border-white/15 rounded-full px-3 py-1.5 text-xs shadow-md">
+              <Database className="w-3.5 h-3.5 text-lime-400" />
+              {availableDatasets.length > 1 ? (
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase">Data:</span>
+                  <select
+                    value={filename}
+                    onChange={(e) => onSwitchDataset && onSwitchDataset(e.target.value)}
+                    className="bg-transparent text-lime-300 font-bold focus:outline-none cursor-pointer max-w-[150px] truncate"
+                  >
+                    {availableDatasets.map((name, idx) => (
+                      <option key={idx} value={name} className="bg-slate-900 text-gray-200">
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <span className="text-lime-300 font-bold max-w-[160px] truncate">
+                  {filename}
+                </span>
+              )}
+
+              {/* Quick Remove / Change Data button */}
+              <button
+                onClick={() => setShowConfirmReset(true)}
+                className="ml-1 w-5 h-5 rounded-full bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                title="Remove current dataset and upload new data"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
+          {/* Gemini Model Selector */}
+          <div className="flex items-center gap-2 bg-slate-900/90 border border-white/15 rounded-full px-3.5 py-1.5 text-xs text-gray-300 shadow-lg hover:border-indigo-400 transition-all">
+            <Bot className="w-3.5 h-3.5 text-cyan-400" />
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
@@ -81,17 +136,18 @@ export default function Header({
             </select>
           </div>
 
+          {/* API Key Modal Button */}
           <button
             onClick={() => setShowKeyModal(true)}
-            className={`pill-badge cursor-pointer transition-all ${
+            className={`pill-badge text-xs py-1.5 px-3.5 cursor-pointer transition-all ${
               apiKey
                 ? 'pill-lime'
                 : 'bg-indigo-600/30 border border-indigo-500/50 text-indigo-300 hover:bg-indigo-600/50 hover:scale-105'
             }`}
           >
-            <Key className="w-3.5 h-3.5" />
-            <span>{apiKey ? 'API Key Active' : 'Set Gemini Key'}</span>
-            {apiKey && <CheckCircle2 className="w-3.5 h-3.5" />}
+            <Key className="w-3 h-3" />
+            <span className="hidden sm:inline">{apiKey ? 'API Key Active' : 'Set Gemini Key'}</span>
+            {apiKey && <CheckCircle2 className="w-3 h-3" />}
           </button>
         </div>
       </div>
@@ -99,6 +155,18 @@ export default function Header({
       {/* Stepper Timeline Navigation */}
       <div className="max-w-7xl mx-auto mt-4 pt-3 border-t border-white/10 overflow-x-auto scrollbar-none">
         <div className="flex items-center justify-between min-w-[900px] gap-2">
+          {/* Step 0 shortcut */}
+          <button
+            onClick={() => setActiveStep(0)}
+            className={`flex items-center gap-1.5 py-2 px-3 rounded-full text-xs font-bold transition-all cursor-pointer ${
+              activeStep === 0
+                ? 'bg-lime-400 text-black shadow-lg font-black'
+                : 'text-gray-400 hover:text-white bg-slate-900/40 border border-white/5'
+            }`}
+          >
+            <span>📁 Upload Hub</span>
+          </button>
+
           {steps.map((step) => {
             const isActive = activeStep === step.id;
             const isPassed = activeStep > step.id;
@@ -131,6 +199,37 @@ export default function Header({
           })}
         </div>
       </div>
+
+      {/* Confirmation Modal: Remove / Reset Dataset */}
+      {showConfirmReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-slide-up">
+          <div className="glass-panel p-7 max-w-md w-full border border-rose-500/30 rounded-3xl shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 mx-auto">
+              <Trash2 className="w-6 h-6 animate-pulse" />
+            </div>
+            <h3 className="text-xl font-extrabold text-white text-center">
+              Remove Current Dataset?
+            </h3>
+            <p className="text-xs text-gray-300 text-center leading-relaxed">
+              This will clear the current loaded dataset (<strong>{filename}</strong>) and reset the downstream cleaning, problem detection, and trained model artifacts so you can start fresh with a new dataset.
+            </p>
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                onClick={() => setShowConfirmReset(false)}
+                className="btn-secondary text-xs py-2.5 px-5"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmReset}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-extrabold text-xs hover:bg-rose-500 transition-all shadow-lg cursor-pointer"
+              >
+                Yes, Remove & Start Fresh
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* API Key Modal */}
       {showKeyModal && (

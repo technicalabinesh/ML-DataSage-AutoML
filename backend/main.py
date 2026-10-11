@@ -7,7 +7,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from backend.dataset_manager import load_file, load_sample_dataset, SESSIONS, get_or_create_session
+from backend.dataset_manager import (
+    load_file, 
+    load_multiple_files,
+    load_sample_dataset, 
+    switch_dataset,
+    remove_dataset,
+    reset_session,
+    SESSIONS, 
+    get_or_create_session
+)
 from backend.data_understanding import analyze_dataset
 from backend.data_cleaning import auto_clean_dataset
 from backend.problem_detector import detect_problem
@@ -38,12 +47,18 @@ def health_check():
 # Pydantic Request Models
 class CleanRequest(BaseModel):
     session_id: str
-    missing_num_strategy: str = "median"
-    missing_cat_strategy: str = "mode"
+    missing_num_strategy: str = "median"          # "median", "mean", "zero", "knn", "drop"
+    missing_cat_strategy: str = "mode"            # "mode", "missing", "knn", "drop"
+    duplicate_strategy: str = "exact"             # "exact", "none", "subset"
+    duplicate_subset_cols: Optional[List[str]] = None
     remove_duplicates: bool = True
-    outlier_strategy: str = "iqr_cap"
-    scaling_strategy: str = "standard"
-    encoding_strategy: str = "auto"
+    outlier_strategy: str = "none"                # "none", "iqr_cap", "zscore_cap", "percentile_cap", "log_transform"
+    scaling_strategy: str = "none"                # "none", "standard", "minmax", "robust", "maxabs"
+    encoding_strategy: str = "onehot"             # "onehot", "ordinal", "label", "target", "frequency", "none", "auto"
+    drop_first: bool = False
+    remove_identifiers: bool = True
+    remove_constants: bool = True
+    target_col: Optional[str] = None
 
 class TrainRequest(BaseModel):
     session_id: str
@@ -65,7 +80,7 @@ class ChatRequest(BaseModel):
     api_key: Optional[str] = None
 
 @app.get("/api/health")
-def health_check():
+def api_health_check():
     return {"status": "ok", "service": "ML DataSage AI Engine"}
 
 @app.post("/api/upload")
@@ -80,10 +95,84 @@ async def upload_dataset(file: UploadFile = File(...), session_id: Optional[str]
         return {
             "session_id": session_id,
             "filename": file.filename,
+            "available_datasets": list(SESSIONS[session_id].get("datasets", {}).keys()),
             "understanding": understanding
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/upload_multiple")
+async def upload_multiple_datasets(
+    files: List[UploadFile] = File(...), 
+    session_id: Optional[str] = Form(None),
+    merge: bool = Form(True)
+):
+    try:
+        session_id = get_or_create_session(session_id)
+        files_data = []
+        for f in files:
+            content = await f.read()
+            files_data.append((content, f.filename))
+            
+        df, active_name, all_datasets = load_multiple_files(files_data, session_id, merge=merge)
+        understanding = analyze_dataset(df)
+        understanding["filename"] = active_name
+        
+        return {
+            "session_id": session_id,
+            "filename": active_name,
+            "available_datasets": all_datasets,
+            "understanding": understanding,
+            "is_merged": merge and len(files_data) > 1,
+            "total_files": len(files_data)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/switch_dataset")
+def api_switch_dataset(session_id: str = Form(...), filename: str = Form(...)):
+    try:
+        df, active_name = switch_dataset(session_id, filename)
+        understanding = analyze_dataset(df)
+        understanding["filename"] = active_name
+        return {
+            "session_id": session_id,
+            "filename": active_name,
+            "available_datasets": list(SESSIONS[session_id].get("datasets", {}).keys()),
+            "understanding": understanding
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/remove_dataset")
+def api_remove_dataset(session_id: str = Form(...), filename: Optional[str] = Form(None)):
+    try:
+        active_name, remaining = remove_dataset(session_id, filename)
+        if not remaining or active_name is None:
+            return {
+                "session_id": session_id,
+                "filename": None,
+                "available_datasets": [],
+                "understanding": None,
+                "is_empty": True
+            }
+        df = SESSIONS[session_id]["raw_df"]
+        understanding = analyze_dataset(df)
+        understanding["filename"] = active_name
+        return {
+            "session_id": session_id,
+            "filename": active_name,
+            "available_datasets": remaining,
+            "understanding": understanding,
+            "is_empty": False
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/reset_session")
+def api_reset_session(session_id: str = Form(...)):
+    reset_session(session_id)
+    return {"status": "ok", "session_id": session_id}
 
 @app.post("/api/load_sample")
 def load_sample(sample_name: str = Form(...), session_id: Optional[str] = Form(None)):
@@ -96,6 +185,7 @@ def load_sample(sample_name: str = Form(...), session_id: Optional[str] = Form(N
         return {
             "session_id": session_id,
             "filename": f"{sample_name}.csv",
+            "available_datasets": list(SESSIONS[session_id].get("datasets", {}).keys()),
             "understanding": understanding
         }
     except Exception as e:
@@ -120,10 +210,16 @@ def clean_data(req: CleanRequest):
         df=raw_df,
         missing_num_strategy=req.missing_num_strategy,
         missing_cat_strategy=req.missing_cat_strategy,
+        duplicate_strategy=req.duplicate_strategy,
+        duplicate_subset_cols=req.duplicate_subset_cols,
         remove_duplicates=req.remove_duplicates,
         outlier_strategy=req.outlier_strategy,
         scaling_strategy=req.scaling_strategy,
-        encoding_strategy=req.encoding_strategy
+        encoding_strategy=req.encoding_strategy,
+        drop_first=req.drop_first,
+        remove_identifiers=req.remove_identifiers,
+        remove_constants=req.remove_constants,
+        target_col=req.target_col
     )
     
     SESSIONS[req.session_id]["cleaned_df"] = cleaned_df

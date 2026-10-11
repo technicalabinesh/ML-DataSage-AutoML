@@ -1,24 +1,81 @@
 import React, { useState } from 'react';
-import { UploadCloud, Sparkles, ArrowRight, Zap, CheckCircle, BrainCircuit } from 'lucide-react';
+import { 
+  UploadCloud, 
+  Sparkles, 
+  ArrowRight, 
+  CheckCircle, 
+  FileText, 
+  Trash2, 
+  Plus, 
+  Layers, 
+  X,
+  Database,
+  Laptop,
+  Briefcase,
+  PlaySquare,
+  Box,
+  Star,
+  Award
+} from 'lucide-react';
 import axios from 'axios';
 
-export default function UploadStep({ onUploadSuccess, backendUrl }) {
+export default function UploadStep({ 
+  onUploadSuccess, 
+  backendUrl, 
+  currentFilename, 
+  currentRows, 
+  currentCols, 
+  onResetDataset 
+}) {
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [stagedFiles, setStagedFiles] = useState([]);
 
-  const handleFileUpload = async (file) => {
-    if (!file) return;
+  const formatSize = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleFilesSelected = (fileList) => {
+    if (!fileList || fileList.length === 0) return;
+    const newFiles = Array.from(fileList);
+    setStagedFiles(prev => {
+      const existingNames = new Set(prev.map(f => f.name));
+      const filtered = newFiles.filter(f => !existingNames.has(f.name));
+      return [...prev, ...filtered];
+    });
+    setError(null);
+  };
+
+  const removeStagedFile = (index) => {
+    setStagedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUploadSubmit = async (merge = true) => {
+    if (stagedFiles.length === 0) return;
     setLoading(true);
     setError(null);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      const res = await axios.post(`${backendUrl}/api/upload`, formData);
-      onUploadSuccess(res.data);
+      if (stagedFiles.length === 1) {
+        const formData = new FormData();
+        formData.append('file', stagedFiles[0]);
+        const res = await axios.post(`${backendUrl}/api/upload`, formData);
+        onUploadSuccess(res.data);
+      } else {
+        const formData = new FormData();
+        stagedFiles.forEach(file => {
+          formData.append('files', file);
+        });
+        formData.append('merge', merge ? 'true' : 'false');
+        const res = await axios.post(`${backendUrl}/api/upload_multiple`, formData);
+        onUploadSuccess(res.data);
+      }
+      setStagedFiles([]);
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to parse file. Please verify CSV/XLSX structure.");
+      setError(err.response?.data?.detail || "Failed to parse files. Please verify CSV/XLSX structure.");
     } finally {
       setLoading(false);
     }
@@ -41,30 +98,37 @@ export default function UploadStep({ onUploadSuccess, backendUrl }) {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 py-6 animate-slide-up relative">
-      {/* Playful Floating Badges */}
-      <div className="hidden lg:block absolute -top-2 left-8 pill-badge pill-lime animate-float shadow-xl z-10">
-        <CheckCircle className="w-3.5 h-3.5 fill-black stroke-lime-400" />
-        Auto ETL Data Cleaning Engine
-      </div>
-      <div className="hidden lg:block absolute top-6 right-8 pill-badge pill-cyan animate-float shadow-xl z-10" style={{ animationDelay: '1.5s' }}>
-        <Sparkles className="w-3.5 h-3.5 text-black" />
-        🏆 Auto-Selects Best ML Algorithm
-      </div>
+    <div className="space-y-8 animate-slide-up pb-4">
+      
+      {/* Active Dataset Alert (if dataset loaded) */}
+      {currentFilename && (
+        <div className="bg-[#f6eee3] p-5 rounded-[28px] border border-[#e8dfd2] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-black text-white flex items-center justify-center">
+              <Database className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Active Loaded Dataset</div>
+              <div className="text-base font-extrabold text-[#1c1917] flex items-center gap-2">
+                <span>{currentFilename}</span>
+                {currentRows && (
+                  <span className="text-xs bg-white text-gray-700 px-2.5 py-0.5 rounded-full font-bold border border-gray-200">
+                    {currentRows} rows • {currentCols || 0} features
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
 
-      {/* Hero Header */}
-      <div className="text-center space-y-4 pt-4">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900 border border-white/15 text-indigo-300 text-xs font-bold shadow-xl animate-pulse">
-          <Zap className="w-4 h-4 text-lime-400 fill-lime-400" />
-          Autonomous Predictive Intelligence & Model Builder
+          <button
+            onClick={onResetDataset}
+            className="px-4 py-2 rounded-full bg-[#ffd2cc] text-[#991b1b] hover:bg-[#ffb6ad] text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Remove Dataset & Start Fresh</span>
+          </button>
         </div>
-        <h2 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
-          Welcome to <span className="gradient-text font-black">ML DataSage AI</span>
-        </h2>
-        <p className="text-gray-300 text-sm max-w-2xl mx-auto font-semibold">
-          Upload any <code className="text-lime-300 font-mono">.csv</code> or <code className="text-lime-300 font-mono">.xlsx</code> file. ML DataSage AI automatically executes complete data cleaning, outlier winsorization, problem detection, model training & evaluation, and answers all your data questions.
-        </p>
-      </div>
+      )}
 
       {/* Upload Drag & Drop Dropzone */}
       <div
@@ -73,101 +137,269 @@ export default function UploadStep({ onUploadSuccess, backendUrl }) {
         onDrop={(e) => {
           e.preventDefault();
           setDragOver(false);
-          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            handleFileUpload(e.dataTransfer.files[0]);
+          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleFilesSelected(e.dataTransfer.files);
           }
         }}
-        className={`glass-panel p-12 border-2 border-dashed transition-all text-center rounded-3xl cursor-pointer ${
-          dragOver ? 'border-lime-400 bg-indigo-500/10 scale-[1.01]' : 'border-white/20 hover:border-indigo-400'
+        className={`bg-white p-8 md:p-10 border-2 border-dashed transition-all text-center rounded-[32px] cursor-pointer shadow-sm ${
+          dragOver ? 'border-black bg-[#fbf8f3] scale-[1.01]' : 'border-[#e2d7c8] hover:border-black'
         }`}
       >
         <input
           type="file"
           accept=".csv,.xlsx,.xls"
           id="file-upload"
+          multiple
           className="hidden"
-          onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+          onChange={(e) => e.target.files && handleFilesSelected(e.target.files)}
         />
-        <label htmlFor="file-upload" className="cursor-pointer block space-y-4">
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-lime-400 p-0.5 shadow-2xl shadow-indigo-500/30 mx-auto">
-            <div className="w-full h-full bg-[#0d1322] rounded-[22px] flex items-center justify-center text-lime-400">
-              <UploadCloud className="w-10 h-10 animate-bounce" />
-            </div>
+        <label htmlFor="file-upload" className="cursor-pointer block space-y-3">
+          <div className="w-16 h-16 rounded-2xl bg-[#1c1917] text-white flex items-center justify-center mx-auto shadow-md">
+            <UploadCloud className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="text-xl font-extrabold text-white">
-              Drop your CSV or Excel file here, or <span className="text-lime-300 underline">browse</span>
+            <h3 className="text-lg md:text-xl font-black text-[#1c1917]">
+              Drop one or multiple CSV / Excel files here, or <span className="underline decoration-2 underline-offset-4">browse</span>
             </h3>
-            <p className="text-xs text-gray-400 mt-1.5 font-semibold">Supports CSV, XLSX • Automatic Column Datatypes, Missing Values & Outlier Detection</p>
+            <p className="text-xs text-gray-500 mt-1 font-semibold">
+              Select multiple datasets at once • Auto-concatenation, schema detection & instant data profiling
+            </p>
           </div>
         </label>
       </div>
 
+      {/* Staged Multi-Files Tray (if files selected) */}
+      {stagedFiles.length > 0 && (
+        <div className="bg-[#f6eee3] p-6 rounded-[28px] border border-[#e8dfd2] space-y-4 animate-slide-up shadow-sm">
+          <div className="flex items-center justify-between border-b border-[#e5dacf] pb-3">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-[#1c1917]" />
+              <h3 className="text-sm font-extrabold text-[#1c1917]">
+                Staged Datasets Ready for Ingestion ({stagedFiles.length})
+              </h3>
+            </div>
+            <button
+              onClick={() => setStagedFiles([])}
+              className="text-xs text-gray-500 hover:text-black flex items-center gap-1 font-bold"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear Selection
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {stagedFiles.map((file, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between p-3 rounded-2xl bg-white border border-[#e8dfd2] text-xs shadow-xs"
+              >
+                <div className="flex items-center gap-2.5 truncate mr-2">
+                  <FileText className="w-4 h-4 text-[#1c1917] shrink-0" />
+                  <div className="truncate">
+                    <div className="font-bold text-[#1c1917] truncate">{file.name}</div>
+                    <div className="text-[10px] text-gray-400">{formatSize(file.size)}</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeStagedFile(idx)}
+                  className="w-5 h-5 rounded-full bg-gray-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center transition-all cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-[#e5dacf]">
+            <label
+              htmlFor="file-upload"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-full bg-white text-gray-800 hover:bg-gray-50 border border-gray-300 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Another File</span>
+            </label>
+
+            {stagedFiles.length > 1 ? (
+              <>
+                <button
+                  onClick={() => handleUploadSubmit(false)}
+                  disabled={loading}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-full bg-white text-[#1c1917] hover:bg-gray-100 border border-gray-300 text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <span>Upload Separately (Switch Anytime)</span>
+                </button>
+
+                <button
+                  onClick={() => handleUploadSubmit(true)}
+                  disabled={loading}
+                  className="w-full sm:w-auto btn-primary text-xs py-2.5 px-6 flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Merge & Combine All {stagedFiles.length} Datasets</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => handleUploadSubmit(false)}
+                disabled={loading}
+                className="w-full sm:w-auto btn-primary text-xs py-2.5 px-6 flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Upload & Analyze Dataset</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {error && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm text-center font-bold animate-slide-up">
+        <div className="p-4 rounded-2xl bg-[#ffd2cc] text-[#991b1b] text-xs font-bold text-center">
           ⚠️ {error}
         </div>
       )}
 
       {loading && (
-        <div className="flex items-center justify-center gap-3 py-6 text-lime-300 text-sm font-extrabold animate-pulse">
-          <div className="w-6 h-6 border-3 border-lime-400 border-t-transparent rounded-full animate-spin" />
-          ML DataSage AI is profiling dataset structure & features...
+        <div className="flex items-center justify-center gap-3 py-4 text-xs font-extrabold text-[#1c1917]">
+          <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+          Profiling dataset schema & feature distributions...
         </div>
       )}
 
-      {/* 1-Click Sample Datasets */}
-      <div className="space-y-4 pt-6 border-t border-white/10">
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          Or Test Instantly with 1-Click Sample Datasets:
-        </h3>
+      {/* Bento Grid: 4 Pastel Preset Cards Exactly Matching Reference Image */}
+      <div className="space-y-3 pt-2">
+        <div className="text-xs font-extrabold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+          <span>Most popular</span>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Sample 1: Telecom Churn */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {/* Card 1: Coral / Salmon */}
           <div
             onClick={() => handleSampleLoad('telecom_churn')}
-            className="glass-panel p-6 cursor-pointer hover:border-indigo-400 hover:-translate-y-1.5 transition-all group rounded-3xl relative overflow-hidden"
+            className="card-coral p-6 cursor-pointer flex flex-col justify-between min-h-[190px] shadow-sm relative group"
           >
-            <div className="flex items-center justify-between mb-4">
-              <span className="pill-badge pill-cyan">
-                Classification
-              </span>
-              <ArrowRight className="w-5 h-5 text-gray-500 group-hover:text-lime-400 group-hover:translate-x-1 transition-all" />
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 text-gray-800 shadow-2xs">
+                  <Laptop className="w-3.5 h-3.5 text-gray-700" />
+                  IT & Software
+                </span>
+                <span className="bg-white/80 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-extrabold text-amber-700 flex items-center gap-1 shadow-2xs">
+                  <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                  4.8
+                </span>
+              </div>
+              <h4 className="text-xl font-extrabold text-[#1c1917] leading-snug group-hover:text-black">
+                Telecom 2026 Customer Churn Classification
+              </h4>
             </div>
-            <h4 className="font-extrabold text-white text-base">Telecom Customer Churn</h4>
-            <p className="text-xs text-gray-400 mt-1.5 font-medium">1,000 rows • Predict customer attrition based on tenure, contract & monthly charges.</p>
+
+            <div className="flex items-center justify-between pt-4 text-xs text-gray-600 font-medium">
+              <span>9,530 students / rows</span>
+              <div className="flex -space-x-2 overflow-hidden">
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffd2cc] bg-purple-400 flex items-center justify-center text-[10px] text-white font-bold">JD</div>
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffd2cc] bg-amber-400 flex items-center justify-center text-[10px] text-white font-bold">AL</div>
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffd2cc] bg-emerald-400 flex items-center justify-center text-[10px] text-white font-bold">MK</div>
+              </div>
+            </div>
           </div>
 
-          {/* Sample 2: Housing Prices */}
+          {/* Card 2: Peach / Apricot */}
           <div
             onClick={() => handleSampleLoad('housing_prices')}
-            className="glass-panel p-6 cursor-pointer hover:border-indigo-400 hover:-translate-y-1.5 transition-all group rounded-3xl relative overflow-hidden"
+            className="card-peach p-6 cursor-pointer flex flex-col justify-between min-h-[190px] shadow-sm relative group"
           >
-            <div className="flex items-center justify-between mb-4">
-              <span className="pill-badge pill-purple">
-                Regression
-              </span>
-              <ArrowRight className="w-5 h-5 text-gray-500 group-hover:text-lime-400 group-hover:translate-x-1 transition-all" />
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 text-gray-800 shadow-2xs">
+                  <Briefcase className="w-3.5 h-3.5 text-gray-700" />
+                  Business
+                </span>
+                <span className="bg-white/80 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-extrabold text-amber-700 flex items-center gap-1 shadow-2xs">
+                  <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                  4.9
+                </span>
+              </div>
+              <h4 className="text-xl font-extrabold text-[#1c1917] leading-snug group-hover:text-black">
+                Powerful Valuation: Housing Price Regression
+              </h4>
             </div>
-            <h4 className="font-extrabold text-white text-base">Housing Price Prediction</h4>
-            <p className="text-xs text-gray-400 mt-1.5 font-medium">1,000 rows • Estimate property valuation using sqft, bedrooms, year built & location.</p>
+
+            <div className="flex items-center justify-between pt-4 text-xs text-gray-600 font-medium">
+              <span>1,463 students / rows</span>
+              <div className="flex -space-x-2 overflow-hidden">
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffe4c7] bg-blue-400 flex items-center justify-center text-[10px] text-white font-bold">TA</div>
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffe4c7] bg-rose-400 flex items-center justify-center text-[10px] text-white font-bold">SC</div>
+              </div>
+            </div>
           </div>
 
-          {/* Sample 3: Customer Segments */}
+          {/* Card 3: Lavender / Lilac */}
           <div
             onClick={() => handleSampleLoad('customer_segmentation')}
-            className="glass-panel p-6 cursor-pointer hover:border-indigo-400 hover:-translate-y-1.5 transition-all group rounded-3xl relative overflow-hidden"
+            className="card-lavender p-6 cursor-pointer flex flex-col justify-between min-h-[190px] shadow-sm relative group"
           >
-            <div className="flex items-center justify-between mb-4">
-              <span className="pill-badge pill-lime">
-                Clustering
-              </span>
-              <ArrowRight className="w-5 h-5 text-gray-500 group-hover:text-lime-400 group-hover:translate-x-1 transition-all" />
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 text-gray-800 shadow-2xs">
+                  <PlaySquare className="w-3.5 h-3.5 text-gray-700" />
+                  Media Training
+                </span>
+                <span className="bg-white/80 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-extrabold text-amber-700 flex items-center gap-1 shadow-2xs">
+                  <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                  4.9
+                </span>
+              </div>
+              <h4 className="text-xl font-extrabold text-[#1c1917] leading-snug group-hover:text-black">
+                Customer Segmentation: Unsupervised Clustering
+              </h4>
             </div>
-            <h4 className="font-extrabold text-white text-base">Customer Segmentation</h4>
-            <p className="text-xs text-gray-400 mt-1.5 font-medium">800 rows • Unsupervised grouping based on income, spending score & loyalty years.</p>
+
+            <div className="flex items-center justify-between pt-4 text-xs text-gray-600 font-medium">
+              <span>6,726 students / rows</span>
+              <div className="flex -space-x-2 overflow-hidden">
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ded8fd] bg-teal-400 flex items-center justify-center text-[10px] text-white font-bold">HP</div>
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ded8fd] bg-orange-400 flex items-center justify-center text-[10px] text-white font-bold">EB</div>
+              </div>
+            </div>
           </div>
+
+          {/* Card 4: Mint / Sage */}
+          <div
+            onClick={() => document.getElementById('file-upload')?.click()}
+            className="card-mint p-6 cursor-pointer flex flex-col justify-between min-h-[190px] shadow-sm relative group"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 text-gray-800 shadow-2xs">
+                  <Box className="w-3.5 h-3.5 text-gray-700" />
+                  Multi-Dataset
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="bg-white/80 backdrop-blur-sm px-2 py-0.5 rounded-full text-[11px] font-extrabold text-amber-700 flex items-center gap-0.5 shadow-2xs">
+                    <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                    5.0
+                  </span>
+                  <span className="bg-white/80 backdrop-blur-sm px-2 py-0.5 rounded-full text-[11px] font-extrabold text-amber-700 flex items-center gap-0.5 shadow-2xs">
+                    <Award className="w-3 h-3 text-amber-600" />
+                    Top 10
+                  </span>
+                </div>
+              </div>
+              <h4 className="text-xl font-extrabold text-[#1c1917] leading-snug group-hover:text-black">
+                Upload & Merge Multiple Custom Datasets
+              </h4>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 text-xs text-gray-600 font-medium">
+              <span>Unlimited files • One-Click Schema Join</span>
+              <div className="flex -space-x-2 overflow-hidden">
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#c8f2da] bg-indigo-500 flex items-center justify-center text-[10px] text-white font-bold">AI</div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

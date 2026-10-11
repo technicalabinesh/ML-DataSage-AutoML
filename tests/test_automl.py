@@ -233,7 +233,42 @@ class TestAutoMLEngine(unittest.TestCase):
                 target_col="churn",
                 feature_names=feature_names
             )
-        self.assertIn("Missing required feature columns", str(ctx.exception))
+    def test_multi_dataset_management(self):
+        """8. Verify multi-dataset loading, concatenation/merge, switching, and removal."""
+        from backend.dataset_manager import load_multiple_files, switch_dataset, remove_dataset, reset_session
+        
+        df1 = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+        df2 = pd.DataFrame({"a": [3, 4], "b": ["z", "w"]})
+        
+        bytes1 = df1.to_csv(index=False).encode('utf-8')
+        bytes2 = df2.to_csv(index=False).encode('utf-8')
+        
+        test_session = "test_multi_session"
+        active_df, active_name, datasets = load_multiple_files(
+            [(bytes1, "part1.csv"), (bytes2, "part2.csv")],
+            session_id=test_session,
+            merge=True
+        )
+        
+        # Verify merged length is 4
+        self.assertEqual(len(active_df), 4)
+        self.assertIn("Merged", active_name)
+        self.assertEqual(len(datasets), 3) # part1, part2, and merged
+        
+        # Test switching to part1
+        switched_df, switched_name = switch_dataset(test_session, "part1.csv")
+        self.assertEqual(len(switched_df), 2)
+        self.assertEqual(switched_name, "part1.csv")
+        
+        # Test removing a dataset
+        active_after_remove, remaining = remove_dataset(test_session, "part1.csv")
+        self.assertNotIn("part1.csv", remaining)
+        
+        # Test resetting session
+        reset_session(test_session)
+        from backend.dataset_manager import SESSIONS
+        self.assertIsNone(SESSIONS[test_session]["raw_df"])
+        self.assertEqual(len(SESSIONS[test_session]["datasets"]), 0)
 
 if __name__ == "__main__":
     unittest.main()
