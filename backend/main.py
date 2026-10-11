@@ -30,6 +30,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+@app.head("/")
+def health_check():
+    return {"status": "healthy", "service": "ML DataSage AI API"}
+
 # Pydantic Request Models
 class CleanRequest(BaseModel):
     session_id: str
