@@ -39,31 +39,33 @@ export default function ProblemStep({ sessionId, backendUrl, datasetColumns, onP
   };
 
   return (
-    <div className="space-y-6 py-4">
+    <div className="space-y-6 py-2 animate-slide-up">
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Target className="w-6 h-6 text-cyan-400" />
+          <h2 className="text-2xl font-black text-[#1c1917] flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#1c1917] text-white flex items-center justify-center">
+              <Target className="w-4 h-4 text-cyan-400" />
+            </div>
             3. Automated Problem & Task Detection
           </h2>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs font-bold text-[#57534e] mt-1">
             Auto-infers whether the machine learning objective is Classification, Regression, or Unsupervised Clustering.
           </p>
         </div>
       </div>
 
       {/* Target Column Selector Card */}
-      <div className="glass-panel p-6 rounded-2xl space-y-5 border-indigo-500/30">
+      <div className="bg-white p-6 rounded-2xl space-y-5 border border-[#e8dfd2] shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
           <div>
-            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block mb-2">
+            <label className="text-xs font-black text-[#1c1917] uppercase tracking-wider block mb-2">
               Select Target Column to Predict:
             </label>
             <select
               value={targetCol}
               onChange={handleTargetChange}
-              className="select-field text-base font-semibold py-2.5 text-indigo-300"
+              className="select-field text-sm font-black py-2.5 text-[#1c1917] bg-[#fbf8f3] border border-[#d6cbbe]"
             >
               <option value="None">-- None (Unsupervised Clustering) --</option>
               {datasetColumns.map((c) => (
@@ -72,29 +74,29 @@ export default function ProblemStep({ sessionId, backendUrl, datasetColumns, onP
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs font-bold text-[#78716c] mt-2">
               💡 Candidate targets identified based on column name semantics and target variation.
             </p>
           </div>
 
           {/* Problem Type Detected Badge Card */}
           {problemInfo && (
-            <div className="glass-panel p-5 rounded-xl border border-white/10 bg-slate-900/60 space-y-3">
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            <div className="p-5 rounded-2xl border border-[#e8dfd2] bg-[#fbf8f3] space-y-3 shadow-2xs">
+              <div className="text-[11px] font-black text-[#78716c] uppercase tracking-wider">
                 Detected Problem Type
               </div>
               <div className="flex items-center gap-3">
-                <span className={`px-4 py-1.5 rounded-xl text-base font-extrabold shadow-lg ${
+                <span className={`px-4 py-1.5 rounded-full text-sm font-black tracking-wide ${
                   problemInfo.problem_type === 'classification'
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-cyan-500/10'
+                    ? 'bg-[#e0f2fe] text-[#0369a1] border border-[#bae6fd]'
                     : problemInfo.problem_type === 'regression'
-                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-purple-500/10'
-                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-emerald-500/10'
+                    ? 'bg-[#f3e8ff] text-[#7e22ce] border border-[#e9d5ff]'
+                    : 'bg-[#dcfce7] text-[#15803d] border border-[#bbf7d0]'
                 }`}>
                   {problemInfo.problem_type?.toUpperCase()}
                 </span>
               </div>
-              <p className="text-xs text-gray-300 leading-relaxed">
+              <p className="text-xs text-[#1c1917] font-semibold leading-relaxed">
                 {problemInfo.reasoning}
               </p>
             </div>
@@ -103,15 +105,15 @@ export default function ProblemStep({ sessionId, backendUrl, datasetColumns, onP
 
         {/* Target Stats Breakdown */}
         {problemInfo && problemInfo.target_stats && Object.keys(problemInfo.target_stats).length > 0 && (
-          <div className="pt-4 border-t border-white/10 space-y-3">
-            <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+          <div className="pt-4 border-t border-[#e8dfd2] space-y-3">
+            <h4 className="text-xs font-black text-[#1c1917] uppercase tracking-wider">
               Target Distribution & Stats
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
               {Object.entries(problemInfo.target_stats).map(([k, v]) => (
-                <div key={k} className="bg-slate-950/60 p-3 rounded-lg border border-white/5 flex justify-between items-center">
-                  <span className="text-gray-400 truncate max-w-[110px]">{k}:</span>
-                  <span className="font-bold text-white">{v}</span>
+                <div key={k} className="bg-[#f6eee3] p-3 rounded-xl border border-[#e8dfd2] flex justify-between items-center">
+                  <span className="text-[#78716c] font-bold truncate max-w-[110px]">{k}:</span>
+                  <span className="font-black text-[#1c1917]">{v}</span>
                 </div>
               ))}
             </div>

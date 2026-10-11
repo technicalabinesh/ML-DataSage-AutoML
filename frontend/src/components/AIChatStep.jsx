@@ -85,8 +85,8 @@ export default function AIChatStep({
       if (trimmed.startsWith('•') || trimmed.startsWith('-')) {
         const bulletContent = trimmed.replace(/^[•\-]\s*/, '');
         return (
-          <div key={idx} className="flex items-start gap-2 my-1 text-gray-200">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 mt-1.5 shrink-0" />
+          <div key={idx} className="flex items-start gap-2 my-1 text-[#1c1917] font-semibold">
+            <span className="w-2 h-2 rounded-full bg-[#1c1917] mt-1.5 shrink-0" />
             <span>{bulletContent}</span>
           </div>
         );
@@ -95,14 +95,14 @@ export default function AIChatStep({
       const isHeader = line === line.toUpperCase() && line.length > 5 && !line.includes(':');
       if (isHeader) {
         return (
-          <h4 key={idx} className="font-extrabold text-sm text-lime-400 tracking-wide mt-3 mb-1 uppercase">
+          <h4 key={idx} className="font-black text-xs text-[#1c1917] tracking-wider mt-3 mb-1 uppercase">
             {line}
           </h4>
         );
       }
 
       return (
-        <p key={idx} className="my-1 text-gray-200 leading-relaxed">
+        <p key={idx} className="my-1 text-[#1c1917] font-semibold leading-relaxed">
           {line}
         </p>
       );
@@ -110,87 +110,85 @@ export default function AIChatStep({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5 py-4 animate-slide-up">
+    <div className="max-w-4xl mx-auto space-y-5 py-2 animate-slide-up">
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-extrabold text-white flex items-center gap-2">
-            <Bot className="w-7 h-7 text-cyan-400 animate-float" />
+          <h2 className="text-2xl font-black text-[#1c1917] flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#1c1917] text-white flex items-center justify-center">
+              <Bot className="w-4 h-4 text-emerald-400" />
+            </div>
             AI Data Analyst & Explanation Workspace
           </h2>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Powered by <span className="pill-badge pill-purple text-[10px] py-0.5 px-2.5">{geminiModel}</span> with zero raw markdown symbols.
+          <p className="text-xs font-bold text-[#57534e] mt-1">
+            Powered by <span className="bg-[#ede9fe] text-[#5b21b6] border border-[#ddd6fe] text-[10px] font-black py-0.5 px-2.5 rounded-full">{geminiModel}</span> with crystal-clear plain reasoning.
           </p>
         </div>
       </div>
 
       {/* Quick Prompts Chips */}
-      <div className="flex flex-wrap gap-2.5">
+      <div className="flex flex-wrap gap-2">
         {quickPrompts.map((q, idx) => (
           <button
             key={idx}
             onClick={() => handleSend(q)}
-            className="pill-badge bg-slate-900 border border-white/15 text-indigo-300 hover:border-indigo-400 hover:text-white transition-all cursor-pointer"
+            className="bg-white border border-[#e8dfd2] text-[#1c1917] font-bold text-xs px-3.5 py-1.5 rounded-full hover:border-black transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span>{q}</span>
           </button>
         ))}
       </div>
 
       {/* Chat Thread Container */}
-      <div className="glass-panel p-6 rounded-3xl border border-white/10 h-[520px] flex flex-col justify-between shadow-2xl relative overflow-hidden">
-        <div className="overflow-y-auto space-y-4 pr-2 scrollbar-none flex-1">
+      <div className="bg-white p-6 rounded-3xl border border-[#e8dfd2] h-[520px] flex flex-col justify-between shadow-sm relative overflow-hidden">
+        <div className="overflow-y-auto space-y-4 pr-2 flex-1">
           {messages.map((m, idx) => (
             <div
               key={idx}
               className={`flex gap-3 animate-slide-up ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {m.sender === 'ai' && (
-                <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-400 p-0.5 shrink-0 shadow-lg shadow-cyan-500/20">
-                  <div className="w-full h-full bg-[#0d1322] rounded-[14px] flex items-center justify-center">
-                    <Bot className="w-5 h-5 text-cyan-300" />
-                  </div>
+                <div className="w-9 h-9 rounded-2xl bg-[#1c1917] text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Bot className="w-5 h-5 text-emerald-400" />
                 </div>
               )}
 
               <div
                 className={`p-4 rounded-2xl text-xs max-w-[85%] leading-relaxed ${
                   m.sender === 'user'
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-br-none shadow-xl shadow-indigo-600/30 font-medium'
-                    : 'bg-slate-900/90 text-gray-100 border border-white/15 rounded-bl-none shadow-md'
+                    ? 'bg-[#1c1917] text-white rounded-br-none shadow-md font-bold'
+                    : 'bg-[#fbf8f3] text-[#1c1917] border border-[#e8dfd2] rounded-bl-none shadow-2xs'
                 }`}
               >
                 {renderFormattedMessage(m.text)}
                 {m.source && (
-                  <div className="text-[10px] text-gray-400 mt-2 font-mono flex items-center gap-1.5 pt-2 border-t border-white/10">
-                    <Zap className="w-3 h-3 text-amber-400" />
-                    <span>Engine: <strong className="text-cyan-300">{m.model_used}</strong></span>
+                  <div className="text-[10px] text-[#78716c] mt-2 font-mono flex items-center gap-1.5 pt-2 border-t border-[#e8dfd2] font-bold">
+                    <Zap className="w-3 h-3 text-amber-500" />
+                    <span>Engine: <strong className="text-[#1c1917]">{m.model_used}</strong></span>
                   </div>
                 )}
               </div>
 
               {m.sender === 'user' && (
-                <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 p-0.5 shrink-0 shadow-lg shadow-purple-500/20">
-                  <div className="w-full h-full bg-[#0d1322] rounded-[14px] flex items-center justify-center">
-                    <User className="w-5 h-5 text-purple-300" />
-                  </div>
+                <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#ffd2cc] to-[#ded8fd] flex items-center justify-center shrink-0 shadow-sm">
+                  <User className="w-5 h-5 text-[#1c1917]" />
                 </div>
               )}
             </div>
           ))}
 
           {loading && (
-            <div className="flex gap-3 items-center text-xs text-gray-300 animate-pulse">
-              <div className="w-9 h-9 rounded-2xl bg-indigo-600/30 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-cyan-400" />
+            <div className="flex gap-3 items-center text-xs text-[#78716c] font-bold animate-pulse">
+              <div className="w-9 h-9 rounded-2xl bg-[#f6eee3] flex items-center justify-center">
+                <Bot className="w-5 h-5 text-[#1c1917]" />
               </div>
-              <div className="bg-slate-900/90 px-4 py-3 rounded-2xl border border-white/10 flex items-center gap-2">
+              <div className="bg-[#fbf8f3] px-4 py-3 rounded-2xl border border-[#e8dfd2] flex items-center gap-2">
                 <span>AI Analyst is reasoning...</span>
                 <div className="flex gap-1">
-                  <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full dot-1" />
-                  <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full dot-2" />
-                  <span className="w-1.5 h-1.5 bg-purple-400 rounded-full dot-3" />
+                  <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce" />
+                  <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce delay-100" />
+                  <span className="w-1.5 h-1.5 bg-black rounded-full animate-bounce delay-200" />
                 </div>
               </div>
             </div>
@@ -201,16 +199,20 @@ export default function AIChatStep({
         {/* Chat Input Bar */}
         <form
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-          className="mt-4 pt-3 border-t border-white/10 flex gap-3"
+          className="mt-4 pt-3 border-t border-[#e8dfd2] flex gap-3"
         >
           <input
             type="text"
             placeholder="Ask AI Analyst: e.g., 'Why this prediction?', 'Explain feature impact'..."
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            className="input-field py-3 text-xs flex-1 rounded-full px-5"
+            className="input-field py-3 text-xs flex-1 rounded-full px-5 bg-[#fbf8f3] border border-[#d6cbbe] text-[#1c1917] font-bold"
           />
-          <button type="submit" disabled={loading || !inputMessage.trim()} className="btn-primary py-3 px-6 rounded-full">
+          <button 
+            type="submit" 
+            disabled={loading || !inputMessage.trim()} 
+            className="btn-primary py-3 px-6 rounded-full cursor-pointer"
+          >
             <Send className="w-4 h-4" />
           </button>
         </form>

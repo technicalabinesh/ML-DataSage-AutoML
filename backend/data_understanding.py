@@ -22,6 +22,8 @@ def analyze_dataset(df: pd.DataFrame) -> Dict[str, Any]:
 
     for col in df.columns:
         series = df[col]
+        if pd.api.types.is_bool_dtype(series):
+            series = series.astype(int)
         missing_count = int(series.isna().sum())
         missing_pct = round((missing_count / total_rows) * 100, 2)
         unique_count = int(series.nunique(dropna=True))

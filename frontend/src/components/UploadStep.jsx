@@ -15,7 +15,8 @@ import {
   PlaySquare,
   Box,
   Star,
-  Award
+  Award,
+  Download
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -84,14 +85,24 @@ export default function UploadStep({
   const handleSampleLoad = async (sampleName) => {
     setLoading(true);
     setError(null);
-    const formData = new FormData();
-    formData.append('sample_name', sampleName);
-
     try {
+      // 1. Try loading via backend load_sample endpoint
+      const formData = new FormData();
+      formData.append('sample_name', sampleName);
       const res = await axios.post(`${backendUrl}/api/load_sample`, formData);
       onUploadSuccess(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to load sample dataset.");
+      console.warn("Backend load_sample endpoint failed, attempting direct CSV fetch & upload fallback:", err);
+      try {
+        // Fallback: fetch CSV file from public static assets and send to upload endpoint
+        const fileRes = await axios.get(`/samples/${sampleName}.csv`, { responseType: 'blob' });
+        const uploadForm = new FormData();
+        uploadForm.append('file', fileRes.data, `${sampleName}.csv`);
+        const res2 = await axios.post(`${backendUrl}/api/upload`, uploadForm);
+        onUploadSuccess(res2.data);
+      } catch (err2) {
+        setError(err.response?.data?.detail || err2.response?.data?.detail || "Failed to load sample dataset. Please check backend connection.");
+      }
     } finally {
       setLoading(false);
     }
@@ -277,30 +288,45 @@ export default function UploadStep({
           {/* Card 1: Coral / Salmon */}
           <div
             onClick={() => handleSampleLoad('telecom_churn')}
-            className="card-coral p-6 cursor-pointer flex flex-col justify-between min-h-[190px] shadow-sm relative group"
+            className="card-coral p-6 cursor-pointer flex flex-col justify-between min-h-[200px] shadow-sm relative group"
           >
             <div>
               <div className="flex items-center justify-between mb-4">
                 <span className="bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 text-gray-800 shadow-2xs">
                   <Laptop className="w-3.5 h-3.5 text-gray-700" />
-                  IT & Software
+                  Classification
                 </span>
-                <span className="bg-white/80 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-extrabold text-amber-700 flex items-center gap-1 shadow-2xs">
-                  <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                  4.8
-                </span>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/samples/telecom_churn.csv"
+                    download="telecom_churn.csv"
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white/90 hover:bg-white px-2.5 py-1 rounded-full text-[11px] font-black text-[#1c1917] flex items-center gap-1 shadow-2xs transition-all border border-black/10 cursor-pointer"
+                    title="Download raw telecom_churn.csv"
+                  >
+                    <Download className="w-3 h-3 text-[#1c1917]" />
+                    <span>CSV</span>
+                  </a>
+                  <span className="bg-white/80 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-extrabold text-amber-700 flex items-center gap-1 shadow-2xs">
+                    <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                    4.8
+                  </span>
+                </div>
               </div>
-              <h4 className="text-xl font-extrabold text-[#1c1917] leading-snug group-hover:text-black">
+              <h4 className="text-xl font-black text-[#1c1917] leading-snug group-hover:text-black">
                 Telecom 2026 Customer Churn Classification
               </h4>
+              <p className="text-xs font-bold text-[#44403c] mt-1">
+                Predict churn risk with LightGBM, XGBoost & CatBoost
+              </p>
             </div>
 
-            <div className="flex items-center justify-between pt-4 text-xs text-gray-600 font-medium">
-              <span>9,530 students / rows</span>
+            <div className="flex items-center justify-between pt-4 text-xs text-[#1c1917] font-bold">
+              <span>1,000 rows • 9 features</span>
               <div className="flex -space-x-2 overflow-hidden">
-                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffd2cc] bg-purple-400 flex items-center justify-center text-[10px] text-white font-bold">JD</div>
-                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffd2cc] bg-amber-400 flex items-center justify-center text-[10px] text-white font-bold">AL</div>
-                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffd2cc] bg-emerald-400 flex items-center justify-center text-[10px] text-white font-bold">MK</div>
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffd2cc] bg-purple-500 flex items-center justify-center text-[10px] text-white font-black">TC</div>
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffd2cc] bg-amber-500 flex items-center justify-center text-[10px] text-white font-black">ML</div>
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffd2cc] bg-emerald-500 flex items-center justify-center text-[10px] text-white font-black">AI</div>
               </div>
             </div>
           </div>
@@ -308,29 +334,44 @@ export default function UploadStep({
           {/* Card 2: Peach / Apricot */}
           <div
             onClick={() => handleSampleLoad('housing_prices')}
-            className="card-peach p-6 cursor-pointer flex flex-col justify-between min-h-[190px] shadow-sm relative group"
+            className="card-peach p-6 cursor-pointer flex flex-col justify-between min-h-[200px] shadow-sm relative group"
           >
             <div>
               <div className="flex items-center justify-between mb-4">
                 <span className="bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 text-gray-800 shadow-2xs">
                   <Briefcase className="w-3.5 h-3.5 text-gray-700" />
-                  Business
+                  Regression
                 </span>
-                <span className="bg-white/80 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-extrabold text-amber-700 flex items-center gap-1 shadow-2xs">
-                  <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                  4.9
-                </span>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/samples/housing_prices.csv"
+                    download="housing_prices.csv"
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white/90 hover:bg-white px-2.5 py-1 rounded-full text-[11px] font-black text-[#1c1917] flex items-center gap-1 shadow-2xs transition-all border border-black/10 cursor-pointer"
+                    title="Download raw housing_prices.csv"
+                  >
+                    <Download className="w-3 h-3 text-[#1c1917]" />
+                    <span>CSV</span>
+                  </a>
+                  <span className="bg-white/80 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-extrabold text-amber-700 flex items-center gap-1 shadow-2xs">
+                    <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                    4.9
+                  </span>
+                </div>
               </div>
-              <h4 className="text-xl font-extrabold text-[#1c1917] leading-snug group-hover:text-black">
+              <h4 className="text-xl font-black text-[#1c1917] leading-snug group-hover:text-black">
                 Powerful Valuation: Housing Price Regression
               </h4>
+              <p className="text-xs font-bold text-[#44403c] mt-1">
+                Continuous price modeling via Random Forest & Ridge
+              </p>
             </div>
 
-            <div className="flex items-center justify-between pt-4 text-xs text-gray-600 font-medium">
-              <span>1,463 students / rows</span>
+            <div className="flex items-center justify-between pt-4 text-xs text-[#1c1917] font-bold">
+              <span>1,005 rows • 9 features</span>
               <div className="flex -space-x-2 overflow-hidden">
-                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffe4c7] bg-blue-400 flex items-center justify-center text-[10px] text-white font-bold">TA</div>
-                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffe4c7] bg-rose-400 flex items-center justify-center text-[10px] text-white font-bold">SC</div>
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffe4c7] bg-blue-500 flex items-center justify-center text-[10px] text-white font-black">HP</div>
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ffe4c7] bg-rose-500 flex items-center justify-center text-[10px] text-white font-black">RE</div>
               </div>
             </div>
           </div>
@@ -338,29 +379,44 @@ export default function UploadStep({
           {/* Card 3: Lavender / Lilac */}
           <div
             onClick={() => handleSampleLoad('customer_segmentation')}
-            className="card-lavender p-6 cursor-pointer flex flex-col justify-between min-h-[190px] shadow-sm relative group"
+            className="card-lavender p-6 cursor-pointer flex flex-col justify-between min-h-[200px] shadow-sm relative group"
           >
             <div>
               <div className="flex items-center justify-between mb-4">
                 <span className="bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 text-gray-800 shadow-2xs">
                   <PlaySquare className="w-3.5 h-3.5 text-gray-700" />
-                  Media Training
+                  Clustering
                 </span>
-                <span className="bg-white/80 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-extrabold text-amber-700 flex items-center gap-1 shadow-2xs">
-                  <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
-                  4.9
-                </span>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/samples/customer_segmentation.csv"
+                    download="customer_segmentation.csv"
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-white/90 hover:bg-white px-2.5 py-1 rounded-full text-[11px] font-black text-[#1c1917] flex items-center gap-1 shadow-2xs transition-all border border-black/10 cursor-pointer"
+                    title="Download raw customer_segmentation.csv"
+                  >
+                    <Download className="w-3 h-3 text-[#1c1917]" />
+                    <span>CSV</span>
+                  </a>
+                  <span className="bg-white/80 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-extrabold text-amber-700 flex items-center gap-1 shadow-2xs">
+                    <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                    4.9
+                  </span>
+                </div>
               </div>
-              <h4 className="text-xl font-extrabold text-[#1c1917] leading-snug group-hover:text-black">
+              <h4 className="text-xl font-black text-[#1c1917] leading-snug group-hover:text-black">
                 Customer Segmentation: Unsupervised Clustering
               </h4>
+              <p className="text-xs font-bold text-[#44403c] mt-1">
+                K-Means & PCA segmentation on income and spend
+              </p>
             </div>
 
-            <div className="flex items-center justify-between pt-4 text-xs text-gray-600 font-medium">
-              <span>6,726 students / rows</span>
+            <div className="flex items-center justify-between pt-4 text-xs text-[#1c1917] font-bold">
+              <span>800 rows • 5 features</span>
               <div className="flex -space-x-2 overflow-hidden">
-                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ded8fd] bg-teal-400 flex items-center justify-center text-[10px] text-white font-bold">HP</div>
-                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ded8fd] bg-orange-400 flex items-center justify-center text-[10px] text-white font-bold">EB</div>
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ded8fd] bg-teal-500 flex items-center justify-center text-[10px] text-white font-black">CS</div>
+                <div className="inline-block h-6 w-6 rounded-full ring-2 ring-[#ded8fd] bg-orange-500 flex items-center justify-center text-[10px] text-white font-black">KM</div>
               </div>
             </div>
           </div>

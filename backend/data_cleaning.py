@@ -210,7 +210,7 @@ def auto_clean_dataset(
     if encoding_strategy != "none" and cat_cols:
         for col in cat_cols:
             if encoding_strategy == "onehot" or (encoding_strategy == "auto" and cleaned_df[col].nunique() <= 10):
-                dummies = pd.get_dummies(cleaned_df[col], prefix=col, drop_first=drop_first)
+                dummies = pd.get_dummies(cleaned_df[col], prefix=col, drop_first=drop_first, dtype=int)
                 cleaned_df = pd.concat([cleaned_df.drop(columns=[col]), dummies], axis=1)
                 report["encoded_columns"].append(f"{col} (One-Hot, {dummies.shape[1]} cols)")
             elif encoding_strategy == "ordinal":
@@ -276,6 +276,10 @@ def auto_clean_dataset(
                 "distribution": {str(k): round(float(v * 100), 1) for k, v in val_counts.items()},
                 "recommendation": "Class imbalance detected! Stratified cross-validation and weighted F1-score will be used automatically."
             }
+
+    # Convert any boolean columns to int to avoid numpy boolean subtraction errors during downstream profiling
+    for bcol in cleaned_df.select_dtypes(include=['bool', 'boolean']).columns:
+        cleaned_df[bcol] = cleaned_df[bcol].astype(int)
 
     report["final_rows"], report["final_cols"] = cleaned_df.shape
     return cleaned_df, report

@@ -62,7 +62,7 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
       setReport(res.data.report);
       onCleanSuccess(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to execute auto data cleaning.");
+      setError(err.response?.data?.detail || "Failed to execute auto data cleaning. Please verify dataset format.");
     } finally {
       setLoading(false);
     }
@@ -75,15 +75,17 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
   };
 
   return (
-    <div className="space-y-6 py-4 animate-slide-up">
+    <div className="space-y-6 py-2 animate-slide-up">
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-white flex items-center gap-2">
-            <Wand2 className="w-6 h-6 text-purple-400" />
+          <h2 className="text-2xl font-black text-[#1c1917] flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#1c1917] text-white flex items-center justify-center">
+              <Wand2 className="w-4 h-4 text-purple-400" />
+            </div>
             2. Auto Data Cleaning & Preprocessing Pipeline
           </h2>
-          <p className="text-xs text-gray-400 mt-1 font-medium">
+          <p className="text-xs font-bold text-[#57534e] mt-1">
             Fine-tune automated data transformations: missing value imputation, outlier winsorization, deduplication, feature scaling & categorical encoding.
           </p>
         </div>
@@ -91,7 +93,7 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
         <button
           onClick={handleClean}
           disabled={loading}
-          className="btn-primary"
+          className="btn-primary cursor-pointer shadow-md text-xs py-2.5 px-6 font-extrabold flex items-center gap-2"
         >
           {loading ? (
             <>
@@ -108,24 +110,24 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
       </div>
 
       {/* Cleaning Config Controls Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Module 1: Missing Value Imputation */}
-        <div className="glass-panel p-5 rounded-2xl space-y-4 border border-white/10 hover:border-amber-500/40 transition-all flex flex-col justify-between">
+        <div className="bg-white p-5 rounded-2xl space-y-4 border border-[#e8dfd2] shadow-xs hover:border-black/30 transition-all flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
-              <h3 className="text-sm font-extrabold text-white">1. Missing Values</h3>
+              <div className="w-3 h-3 rounded-full bg-amber-500" />
+              <h3 className="text-sm font-black text-[#1c1917]">1. Missing Values</h3>
             </div>
-            <p className="text-[11px] text-gray-400 leading-tight">Impute incomplete cells across features.</p>
+            <p className="text-[11px] font-bold text-[#57534e] leading-tight">Impute incomplete cells across features.</p>
 
-            <div className="space-y-3 pt-2 text-xs">
+            <div className="space-y-3 pt-1 text-xs">
               <div>
-                <label className="text-gray-300 font-semibold block mb-1">Numerical Features</label>
+                <label className="text-[#1c1917] font-black block mb-1">Numerical Features</label>
                 <select
                   value={missingNum}
                   onChange={(e) => setMissingNum(e.target.value)}
-                  className="select-field"
+                  className="select-field text-xs font-bold text-[#1c1917]"
                 >
                   <option value="median">Median (Recommended; outlier robust)</option>
                   <option value="mean">Mean Imputation</option>
@@ -136,14 +138,14 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
               </div>
 
               <div>
-                <label className="text-gray-300 font-semibold block mb-1">Categorical Features</label>
+                <label className="text-[#1c1917] font-black block mb-1">Categorical Features</label>
                 <select
                   value={missingCat}
                   onChange={(e) => setMissingCat(e.target.value)}
-                  className="select-field"
+                  className="select-field text-xs font-bold text-[#1c1917]"
                 >
                   <option value="mode">Most Frequent Category (Mode)</option>
-                  <option value="missing">Create 'Missing' Category</option>
+                  <option value="missing">Create &apos;Missing&apos; Category</option>
                   <option value="knn">KNN Imputation (Encoded)</option>
                   <option value="drop">Drop Rows with Missing</option>
                 </select>
@@ -151,27 +153,27 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
             </div>
           </div>
 
-          <div className="text-[11px] text-amber-300/80 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20 font-medium">
+          <div className="text-[11px] text-[#854d0e] bg-[#fef9c3] p-2.5 rounded-xl border border-[#fef08a] font-bold">
             💡 <strong>Recommended:</strong> Median for numbers & Mode for categories.
           </div>
         </div>
 
         {/* Module 2: Outliers & Duplicates */}
-        <div className="glass-panel p-5 rounded-2xl space-y-4 border border-white/10 hover:border-rose-500/40 transition-all flex flex-col justify-between">
+        <div className="bg-white p-5 rounded-2xl space-y-4 border border-[#e8dfd2] shadow-xs hover:border-black/30 transition-all flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-rose-400 animate-pulse" />
-              <h3 className="text-sm font-extrabold text-white">2. Outliers & Duplicates</h3>
+              <div className="w-3 h-3 rounded-full bg-rose-500" />
+              <h3 className="text-sm font-black text-[#1c1917]">2. Outliers & Duplicates</h3>
             </div>
-            <p className="text-[11px] text-gray-400 leading-tight">Mitigate extreme outliers & deduplicate rows.</p>
+            <p className="text-[11px] font-bold text-[#57534e] leading-tight">Mitigate extreme outliers & deduplicate rows.</p>
 
-            <div className="space-y-3 pt-2 text-xs">
+            <div className="space-y-3 pt-1 text-xs">
               <div>
-                <label className="text-gray-300 font-semibold block mb-1">Outlier Treatment</label>
+                <label className="text-[#1c1917] font-black block mb-1">Outlier Treatment</label>
                 <select
                   value={outlierStrat}
                   onChange={(e) => setOutlierStrat(e.target.value)}
-                  className="select-field"
+                  className="select-field text-xs font-bold text-[#1c1917]"
                 >
                   <option value="none">Keep Outliers Unchanged (Default)</option>
                   <option value="iqr_cap">IQR Winsorization (Boundaries clipping)</option>
@@ -182,11 +184,11 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
               </div>
 
               <div>
-                <label className="text-gray-300 font-semibold block mb-1">Duplicate Handling</label>
+                <label className="text-[#1c1917] font-black block mb-1">Duplicate Handling</label>
                 <select
                   value={duplicateStrat}
                   onChange={(e) => setDuplicateStrat(e.target.value)}
-                  className="select-field"
+                  className="select-field text-xs font-bold text-[#1c1917]"
                 >
                   <option value="exact">Remove Exact Duplicate Rows</option>
                   <option value="none">Keep Duplicates</option>
@@ -195,18 +197,18 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
               </div>
 
               {duplicateStrat === 'subset' && datasetColumns.length > 0 && (
-                <div className="space-y-1.5 p-2 bg-slate-900/60 rounded-xl border border-white/10 max-h-24 overflow-y-auto scrollbar-thin">
-                  <div className="text-[10px] text-gray-400 font-bold uppercase">Select Subset Columns:</div>
+                <div className="space-y-1.5 p-2 bg-[#f6eee3] rounded-xl border border-[#e8dfd2] max-h-24 overflow-y-auto">
+                  <div className="text-[10px] text-[#78716c] font-black uppercase">Select Subset Columns:</div>
                   <div className="flex flex-wrap gap-1.5">
                     {datasetColumns.slice(0, 15).map(col => (
                       <button
                         key={col}
                         type="button"
                         onClick={() => toggleSubsetCol(col)}
-                        className={`text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all ${
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
                           duplicateSubsetCols.includes(col)
-                            ? 'bg-rose-500 text-white'
-                            : 'bg-slate-800 text-gray-400 hover:text-white'
+                            ? 'bg-[#1c1917] text-white'
+                            : 'bg-white text-[#1c1917] border border-[#d6cbbe]'
                         }`}
                       >
                         {col}
@@ -218,27 +220,27 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
             </div>
           </div>
 
-          <div className="text-[11px] text-rose-300/80 bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/20 font-medium">
+          <div className="text-[11px] text-[#9f1239] bg-[#ffe4e6] p-2.5 rounded-xl border border-[#fecdd3] font-bold">
             💡 <strong>Tree Models:</strong> Keep unchanged initially; clipping helps linear/KNN models.
           </div>
         </div>
 
         {/* Module 3: Feature Scaling */}
-        <div className="glass-panel p-5 rounded-2xl space-y-4 border border-white/10 hover:border-cyan-500/40 transition-all flex flex-col justify-between">
+        <div className="bg-white p-5 rounded-2xl space-y-4 border border-[#e8dfd2] shadow-xs hover:border-black/30 transition-all flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
-              <h3 className="text-sm font-extrabold text-white">3. Feature Scaling</h3>
+              <div className="w-3 h-3 rounded-full bg-cyan-600" />
+              <h3 className="text-sm font-black text-[#1c1917]">3. Feature Scaling</h3>
             </div>
-            <p className="text-[11px] text-gray-400 leading-tight">Normalize magnitude across numeric features.</p>
+            <p className="text-[11px] font-bold text-[#57534e] leading-tight">Normalize magnitude across numeric features.</p>
 
-            <div className="space-y-3 pt-2 text-xs">
+            <div className="space-y-3 pt-1 text-xs">
               <div>
-                <label className="text-gray-300 font-semibold block mb-1">Scaling Strategy</label>
+                <label className="text-[#1c1917] font-black block mb-1">Scaling Strategy</label>
                 <select
                   value={scalingStrat}
                   onChange={(e) => setScalingStrat(e.target.value)}
-                  className="select-field"
+                  className="select-field text-xs font-bold text-[#1c1917]"
                 >
                   <option value="none">No Scaling (Default for Tree / Boosting)</option>
                   <option value="standard">StandardScaler (Mean=0, Std=1; Logistic/KNN)</option>
@@ -248,25 +250,25 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
                 </select>
               </div>
 
-              <div className="space-y-2 pt-2">
-                <label className="text-gray-300 font-semibold block text-[11px]">Feature Selection Toggles</label>
+              <div className="space-y-2 pt-1">
+                <label className="text-[#1c1917] font-black block text-[11px]">Feature Selection Toggles</label>
                 
-                <label className="flex items-center gap-2 cursor-pointer text-gray-300 hover:text-white transition-all">
+                <label className="flex items-center gap-2 cursor-pointer text-[#1c1917] font-bold">
                   <input
                     type="checkbox"
                     checked={removeIdentifiers}
                     onChange={(e) => setRemoveIdentifiers(e.target.checked)}
-                    className="w-4 h-4 accent-cyan-400 rounded cursor-pointer"
+                    className="w-4 h-4 accent-black rounded cursor-pointer"
                   />
                   <span className="text-[11px]">Drop unique ID / UUID columns</span>
                 </label>
 
-                <label className="flex items-center gap-2 cursor-pointer text-gray-300 hover:text-white transition-all">
+                <label className="flex items-center gap-2 cursor-pointer text-[#1c1917] font-bold">
                   <input
                     type="checkbox"
                     checked={removeConstants}
                     onChange={(e) => setRemoveConstants(e.target.checked)}
-                    className="w-4 h-4 accent-cyan-400 rounded cursor-pointer"
+                    className="w-4 h-4 accent-black rounded cursor-pointer"
                   />
                   <span className="text-[11px]">Drop constant zero-variance columns</span>
                 </label>
@@ -274,27 +276,27 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
             </div>
           </div>
 
-          <div className="text-[11px] text-cyan-300/80 bg-cyan-500/10 p-2.5 rounded-xl border border-cyan-500/20 font-medium">
+          <div className="text-[11px] text-[#075985] bg-[#e0f2fe] p-2.5 rounded-xl border border-[#bae6fd] font-bold">
             💡 <strong>Trees:</strong> Scaling is unnecessary for LightGBM, Random Forest, & HistGradient.
           </div>
         </div>
 
         {/* Module 4: Categorical Encoding */}
-        <div className="glass-panel p-5 rounded-2xl space-y-4 border border-white/10 hover:border-lime-500/40 transition-all flex flex-col justify-between">
+        <div className="bg-white p-5 rounded-2xl space-y-4 border border-[#e8dfd2] shadow-xs hover:border-black/30 transition-all flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-lime-400 animate-pulse" />
-              <h3 className="text-sm font-extrabold text-white">4. Categorical Encoding</h3>
+              <div className="w-3 h-3 rounded-full bg-emerald-600" />
+              <h3 className="text-sm font-black text-[#1c1917]">4. Categorical Encoding</h3>
             </div>
-            <p className="text-[11px] text-gray-400 leading-tight">Convert strings into model-digestible vectors.</p>
+            <p className="text-[11px] font-bold text-[#57534e] leading-tight">Convert strings into model-digestible vectors.</p>
 
-            <div className="space-y-3 pt-2 text-xs">
+            <div className="space-y-3 pt-1 text-xs">
               <div>
-                <label className="text-gray-300 font-semibold block mb-1">Encoding Strategy</label>
+                <label className="text-[#1c1917] font-black block mb-1">Encoding Strategy</label>
                 <select
                   value={encodingStrat}
                   onChange={(e) => setEncodingStrat(e.target.value)}
-                  className="select-field"
+                  className="select-field text-xs font-bold text-[#1c1917]"
                 >
                   <option value="onehot">One-Hot Encoding (Best general baseline)</option>
                   <option value="ordinal">Ordinal Encoding (Preserves rank order)</option>
@@ -306,13 +308,13 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
               </div>
 
               {encodingStrat === 'onehot' && (
-                <div className="pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-gray-300 hover:text-white transition-all">
+                <div className="pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-[#1c1917] font-bold">
                     <input
                       type="checkbox"
                       checked={dropFirst}
                       onChange={(e) => setDropFirst(e.target.checked)}
-                      className="w-4 h-4 accent-lime-400 rounded cursor-pointer"
+                      className="w-4 h-4 accent-black rounded cursor-pointer"
                     />
                     <span className="text-[11px]">Drop First Category (Reduces collinearity)</span>
                   </label>
@@ -321,7 +323,7 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
             </div>
           </div>
 
-          <div className="text-[11px] text-lime-300/80 bg-lime-500/10 p-2.5 rounded-xl border border-lime-500/20 font-medium">
+          <div className="text-[11px] text-[#3f6212] bg-[#ecfccb] p-2.5 rounded-xl border border-[#d9f99d] font-bold">
             💡 <strong>Default:</strong> One-Hot Encoding for nominal features without data leakage.
           </div>
         </div>
@@ -329,50 +331,50 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
       </div>
 
       {error && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm text-center font-bold animate-slide-up">
+        <div className="p-4 rounded-2xl bg-[#fee2e2] border border-[#fca5a5] text-[#991b1b] text-sm text-center font-black animate-slide-up">
           ⚠️ {error}
         </div>
       )}
 
       {/* Cleaning Results Summary Card */}
       {report && (
-        <div className="glass-panel p-6 rounded-3xl border-emerald-500/30 space-y-5 bg-emerald-950/15 animate-slide-up">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/10 pb-4">
-            <h3 className="text-base font-extrabold text-emerald-400 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+        <div className="bg-white p-6 rounded-3xl border border-[#bbf7d0] space-y-5 shadow-sm animate-slide-up">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#e8dfd2] pb-4">
+            <h3 className="text-base font-black text-emerald-800 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               Automated Data Cleaning Successfully Executed!
             </h3>
-            <span className="text-xs text-gray-300 font-mono bg-slate-900/80 px-3 py-1 rounded-full border border-white/10">
+            <span className="text-xs text-[#1c1917] font-mono font-bold bg-[#f6eee3] px-3 py-1 rounded-full border border-[#e8dfd2]">
               Rows: {report.initial_rows} ➔ {report.final_rows} • Cols: {report.initial_cols} ➔ {report.final_cols}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-            <div className="bg-slate-900/70 p-3.5 rounded-2xl border border-white/5">
-              <div className="text-gray-400 font-semibold">Duplicates Handled</div>
-              <div className="text-xl font-black text-white mt-1">{report.duplicates_removed} rows</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div className="bg-[#fbf8f3] p-3.5 rounded-2xl border border-[#e8dfd2]">
+              <div className="text-[#78716c] font-black uppercase text-[10px]">Duplicates Handled</div>
+              <div className="text-xl font-black text-[#1c1917] mt-1">{report.duplicates_removed} rows</div>
             </div>
-            <div className="bg-slate-900/70 p-3.5 rounded-2xl border border-white/5">
-              <div className="text-gray-400 font-semibold">Missing Imputed</div>
-              <div className="text-xl font-black text-emerald-400 mt-1">{report.missing_filled} cells</div>
+            <div className="bg-[#fbf8f3] p-3.5 rounded-2xl border border-[#e8dfd2]">
+              <div className="text-[#78716c] font-black uppercase text-[10px]">Missing Imputed</div>
+              <div className="text-xl font-black text-emerald-700 mt-1">{report.missing_filled} cells</div>
             </div>
-            <div className="bg-slate-900/70 p-3.5 rounded-2xl border border-white/5">
-              <div className="text-gray-400 font-semibold">Outliers Treated</div>
-              <div className="text-xl font-black text-amber-400 mt-1">{report.outliers_capped} values</div>
+            <div className="bg-[#fbf8f3] p-3.5 rounded-2xl border border-[#e8dfd2]">
+              <div className="text-[#78716c] font-black uppercase text-[10px]">Outliers Treated</div>
+              <div className="text-xl font-black text-amber-700 mt-1">{report.outliers_capped} values</div>
             </div>
-            <div className="bg-slate-900/70 p-3.5 rounded-2xl border border-white/5">
-              <div className="text-gray-400 font-semibold">Features Pruned</div>
-              <div className="text-xl font-black text-purple-400 mt-1">{report.removed_columns?.length || 0} cols</div>
+            <div className="bg-[#fbf8f3] p-3.5 rounded-2xl border border-[#e8dfd2]">
+              <div className="text-[#78716c] font-black uppercase text-[10px]">Features Pruned</div>
+              <div className="text-xl font-black text-purple-700 mt-1">{report.removed_columns?.length || 0} cols</div>
             </div>
           </div>
 
           {/* Class Imbalance Intelligence Alert */}
           {report.class_imbalance && (
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs text-amber-300">
-              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="p-4 rounded-2xl bg-[#fffbeb] border border-[#fef08a] flex items-start gap-3 text-xs text-[#92400e]">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-amber-200">Class Imbalance Detected on '{report.class_imbalance.column}':</strong> Minority class is only {report.class_imbalance.minority_share_percent}%.
-                <p className="text-gray-300 mt-1">
+                <strong className="text-[#78350f]">Class Imbalance Detected on &apos;{report.class_imbalance.column}&apos;:</strong> Minority class is only {report.class_imbalance.minority_share_percent}%.
+                <p className="text-[#92400e] mt-1 font-semibold">
                   Per best practice, the pipeline will preserve natural class distributions and automatically utilize <strong>Stratified K-Fold Cross-Validation</strong> & <strong>Weighted F1-Score</strong> rather than artificial resampling.
                 </p>
               </div>
@@ -380,19 +382,19 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
           )}
 
           {/* Transformations Log */}
-          <div className="space-y-1.5 text-xs text-gray-300 bg-slate-900/50 p-4 rounded-2xl border border-white/5">
-            <div className="font-extrabold text-gray-400 mb-2 flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-lime-400" />
+          <div className="space-y-1.5 text-xs text-[#1c1917] bg-[#fbf8f3] p-4 rounded-2xl border border-[#e8dfd2]">
+            <div className="font-black text-[#1c1917] mb-2 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
               Applied Pipeline Transformations:
             </div>
             {report.transformations_applied.length > 0 ? (
               report.transformations_applied.map((t, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-emerald-300 font-medium">
-                  <span className="text-emerald-400 font-bold">✓</span> {t}
+                <div key={idx} className="flex items-center gap-2 text-[#1c1917] font-bold">
+                  <span className="text-emerald-600 font-black">✓</span> {t}
                 </div>
               ))
             ) : (
-              <div className="text-gray-500">No transformations required; dataset is already clean!</div>
+              <div className="text-[#78716c] font-bold">No transformations required; dataset is already clean!</div>
             )}
           </div>
         </div>
