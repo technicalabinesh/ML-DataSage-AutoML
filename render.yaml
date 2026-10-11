@@ -17,7 +17,7 @@ services:
     name: automl-analyst-frontend
     runtime: static
     rootDir: frontend
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=optional && npm run build
     staticPublishPath: ./dist
     routes:
       - type: rewrite
@@ -25,6 +25,6 @@ services:
         destination: /index.html
     envVars:
       - key: NODE_VERSION
-        value: 20.18.0
+        value: 22.14.0
       - key: VITE_BACKEND_URL
         value: https://automl-analyst-backend-k0qn.onrender.com
