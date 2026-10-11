@@ -30,4 +30,4 @@ services:
         fromService:
           type: web
           name: automl-analyst-backend
-          property: url
+          property: host

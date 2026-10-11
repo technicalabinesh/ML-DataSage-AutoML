@@ -8,7 +8,10 @@ import TrainingStep from './components/TrainingStep';
 import PredictionStep from './components/PredictionStep';
 import AIChatStep from './components/AIChatStep';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
+const rawBackendUrl = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
+const BACKEND_URL = (rawBackendUrl && !rawBackendUrl.startsWith('http://') && !rawBackendUrl.startsWith('https://'))
+  ? `https://${rawBackendUrl}`
+  : rawBackendUrl;
 
 export default function App() {
   const [activeStep, setActiveStep] = useState(0); // 0 = Upload, 1-7 = Steps
