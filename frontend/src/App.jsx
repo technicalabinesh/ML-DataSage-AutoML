@@ -57,12 +57,15 @@ const GEMINI_MODELS = [
   { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Legacy Fast)' }
 ];
 
-const PRESET_USERS = [
-  { name: 'Annette Black', initials: 'AB', role: 'Lead ML Engineer', pipelinesCount: 274, email: 'annette.black@ml-datasage.ai', totalHours: 4.8 },
-  { name: 'Abinesh', initials: 'AB', role: 'Senior Data Scientist', pipelinesCount: 142, email: 'abinesh@datasage.ai', totalHours: 6.2 },
-  { name: 'Hari', initials: 'HA', role: 'ML Research Lead', pipelinesCount: 89, email: 'hari@datasage.ai', totalHours: 8.5 },
-  { name: 'Guest Analyst', initials: 'GA', role: 'AutoML Explorer', pipelinesCount: 12, email: 'guest@datasage.ai', totalHours: 1.2 },
-];
+const DEFAULT_GUEST_USER = {
+  name: 'Guest Analyst',
+  initials: 'GA',
+  role: 'AutoML Explorer',
+  pipelinesCount: 0,
+  email: 'guest@datasage.ai',
+  isGuest: true,
+  totalHours: 0.5
+};
 
 export default function App() {
   const [activeStep, setActiveStep] = useState(0); // 0 = Upload, 1 = Understand, 2 = Clean, 3 = Problem, 4 = Train, 6 = Predict, 7 = Chat
@@ -85,12 +88,9 @@ export default function App() {
     } catch (e) {
       console.warn("Could not parse saved user:", e);
     }
-    return PRESET_USERS[0];
+    return DEFAULT_GUEST_USER;
   });
   const [showLoginPage, setShowLoginPage] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [customName, setCustomName] = useState('');
-  const [customRole, setCustomRole] = useState('Data Analyst');
 
   // Track session usage time (Hours used)
   const [sessionSeconds, setSessionSeconds] = useState(0);
@@ -174,23 +174,17 @@ export default function App() {
       console.warn("Could not persist user:", e);
     }
     setShowLoginPage(false);
-    setShowLoginModal(false);
   };
 
-  const handleCustomLogin = (e) => {
-    e.preventDefault();
-    if (!customName.trim()) return;
-    const initials = customName.trim().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'US';
-    const newUser = {
-      name: customName.trim(),
-      initials,
-      role: customRole || 'Data Analyst',
-      pipelinesCount: Math.floor(Math.random() * 25) + 1,
-      email: `${customName.toLowerCase().replace(/\s+/g, '.')}@datasage.ai`,
-      totalHours: 2.0
-    };
-    handleLogin(newUser);
-    setCustomName('');
+  const handleLogout = (e) => {
+    if (e) e.stopPropagation();
+    try {
+      localStorage.removeItem('automl_user');
+    } catch (err) {
+      console.warn("Could not clear user:", err);
+    }
+    setCurrentUser(DEFAULT_GUEST_USER);
+    setShowLoginPage(true);
   };
 
   const handleUploadSuccess = (data) => {
@@ -419,7 +413,13 @@ export default function App() {
               title="Open Login Page / Switch User"
             >
               <LogIn className="w-3.5 h-3.5 text-[#1c1917]" />
-              <span>{showLoginPage ? 'Back to Studio' : currentUser.name}</span>
+              <span>
+                {showLoginPage 
+                  ? 'Back to Studio' 
+                  : currentUser.isGuest 
+                    ? 'Sign In / Guest' 
+                    : currentUser.name}
+              </span>
             </button>
             <Share2 className="w-4 h-4 text-[#78716c] cursor-pointer hover:text-black" />
             <Download className="w-4 h-4 text-[#78716c] cursor-pointer hover:text-black" />
@@ -572,7 +572,6 @@ export default function App() {
               <div className="pt-2">
                 {showLoginPage ? (
                   <LoginPage
-                    presetUsers={PRESET_USERS}
                     currentUser={currentUser}
                     onLogin={handleLogin}
                     onCancel={() => setShowLoginPage(false)}
@@ -672,10 +671,19 @@ export default function App() {
                   title="Open Login Page"
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  <span>Login / Switch</span>
+                  <span>{currentUser.isGuest ? 'Sign In / Guest' : 'Switch User'}</span>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  {!currentUser.isGuest && (
+                    <button
+                      onClick={handleLogout}
+                      className="text-[10px] font-black text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded-full cursor-pointer transition-all border border-rose-200"
+                      title="Sign Out"
+                    >
+                      Sign Out
+                    </button>
+                  )}
                   <div className="relative cursor-pointer hover:text-black">
                     <Bell className="w-4 h-4" />
                     <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full" />
@@ -702,7 +710,7 @@ export default function App() {
                       {currentUser.initials}
                     </div>
                   </div>
-                  <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
+                  <div className={`absolute bottom-0 right-0 w-4 h-4 border-2 border-white rounded-full ${currentUser.isGuest ? 'bg-amber-400' : 'bg-emerald-500'}`} />
                 </div>
                 <div>
                   <h3 className="font-black text-[#1c1917] text-base group-hover:underline flex items-center justify-center gap-1">
