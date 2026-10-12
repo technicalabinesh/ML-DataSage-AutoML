@@ -328,6 +328,28 @@ export default function App() {
     }
   };
 
+  const handleDownloadDataset = async () => {
+    if (!sessionId) {
+      alert("Please upload and clean a dataset first.");
+      return;
+    }
+    try {
+      const res = await axios.get(`${BACKEND_URL}/api/download_cleaned/${sessionId}`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([res.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Cleaned_${filename || 'dataset'}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.warn("Could not download cleaned dataset:", e);
+      alert("Please run Step 2 (Auto Data Cleaning) first to download the cleaned dataset.");
+    }
+  };
+
   // Nav item list for Left Rail
   const navItems = [
     { step: 0, icon: Home, label: "Upload Hub" },
@@ -422,7 +444,11 @@ export default function App() {
               </span>
             </button>
             <Share2 className="w-4 h-4 text-[#78716c] cursor-pointer hover:text-black" />
-            <Download className="w-4 h-4 text-[#78716c] cursor-pointer hover:text-black" />
+            <Download 
+              onClick={handleDownloadDataset} 
+              className="w-4 h-4 text-[#78716c] cursor-pointer hover:text-black transition-colors" 
+              title="Download Cleaned Dataset (CSV)"
+            />
           </div>
         </div>
 

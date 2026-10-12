@@ -234,6 +234,26 @@ def clean_data(req: CleanRequest):
         "understanding": post_understanding
     }
 
+@app.get("/api/download_cleaned/{session_id}")
+def download_cleaned_dataset(session_id: str):
+    if session_id not in SESSIONS or SESSIONS[session_id].get("cleaned_df") is None:
+        raise HTTPException(status_code=404, detail="No cleaned dataset found. Please run data cleaning first.")
+    
+    cleaned_df = SESSIONS[session_id]["cleaned_df"]
+    raw_filename = SESSIONS[session_id].get("filename") or "dataset"
+    base_name = os.path.splitext(raw_filename)[0].replace(" ", "_")
+    clean_filename = f"Cleaned_{base_name}.csv"
+    
+    csv_bytes = cleaned_df.to_csv(index=False).encode('utf-8')
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={clean_filename}",
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )
+
 @app.get("/api/detect_problem/{session_id}")
 def get_problem_detection(session_id: str, target_col: Optional[str] = None):
     if session_id not in SESSIONS or SESSIONS[session_id]["cleaned_df"] is None:

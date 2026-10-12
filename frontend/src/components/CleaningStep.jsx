@@ -12,7 +12,8 @@ import {
   Copy, 
   Cpu, 
   AlertTriangle,
-  Scale
+  Scale,
+  Download
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -38,8 +39,31 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
   const [removeConstants, setRemoveConstants] = useState(true);
   
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [report, setReport] = useState(null);
   const [error, setError] = useState(null);
+
+  const handleDownloadCleaned = async () => {
+    if (!sessionId) return;
+    setDownloading(true);
+    try {
+      const res = await axios.get(`${backendUrl}/api/download_cleaned/${sessionId}`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([res.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Cleaned_dataset.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download cleaned dataset:", err);
+      setError("Failed to download cleaned dataset.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const handleClean = async () => {
     setLoading(true);
@@ -339,14 +363,35 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
       {/* Cleaning Results Summary Card */}
       {report && (
         <div className="bg-white p-6 rounded-3xl border border-[#bbf7d0] space-y-5 shadow-sm animate-slide-up">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[#e8dfd2] pb-4">
-            <h3 className="text-base font-black text-emerald-800 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              Automated Data Cleaning Successfully Executed!
-            </h3>
-            <span className="text-xs text-[#1c1917] font-mono font-bold bg-[#f6eee3] px-3 py-1 rounded-full border border-[#e8dfd2]">
-              Rows: {report.initial_rows} ➔ {report.final_rows} • Cols: {report.initial_cols} ➔ {report.final_cols}
-            </span>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#e8dfd2] pb-4">
+            <div>
+              <h3 className="text-base font-black text-emerald-800 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                Automated Data Cleaning Successfully Executed!
+              </h3>
+              <span className="text-xs text-[#78716c] font-bold mt-0.5 block">
+                Rows: {report.initial_rows} ➔ {report.final_rows} • Cols: {report.initial_cols} ➔ {report.final_cols}
+              </span>
+            </div>
+
+            <button
+              onClick={handleDownloadCleaned}
+              disabled={downloading}
+              className="bg-[#1c1917] hover:bg-black text-white text-xs font-black py-2.5 px-4 rounded-xl shadow-sm flex items-center gap-2 cursor-pointer transition-all shrink-0"
+              title="Download preprocessed and cleaned CSV dataset"
+            >
+              {downloading ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Downloading...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5 text-lime-300" />
+                  <span>Download Cleaned CSV</span>
+                </>
+              )}
+            </button>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
