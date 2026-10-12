@@ -1,5 +1,7 @@
 import os
+import io
 import json
+import numpy as np
 import pandas as pd
 from typing import Dict, Any, Optional, List
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Response
@@ -48,17 +50,27 @@ def health_check():
 # Pydantic Request Models
 class CleanRequest(BaseModel):
     session_id: str
-    missing_num_strategy: str = "median"          # "median", "mean", "zero", "knn", "drop"
-    missing_cat_strategy: str = "mode"            # "mode", "missing", "knn", "drop"
+    missing_num_strategy: str = "median"          # "median", "mean", "zero", "knn", "drop", "keep"
+    missing_cat_strategy: str = "mode"            # "mode", "missing", "knn", "drop", "keep"
+    missing_cat_fill_value: str = "Missing"
+    convert_empty_to_nan: bool = True
     duplicate_strategy: str = "exact"             # "exact", "none", "subset"
     duplicate_subset_cols: Optional[List[str]] = None
+    duplicate_keep: str = "first"                 # "first", "last"
     remove_duplicates: bool = True
-    outlier_strategy: str = "none"                # "none", "iqr_cap", "zscore_cap", "percentile_cap", "log_transform"
+    outlier_strategy: str = "none"                # "none", "iqr_cap", "zscore_cap", "percentile_cap", "remove_rows", "log_transform"
+    percentile_lower: float = 0.01
+    percentile_upper: float = 0.99
     scaling_strategy: str = "none"                # "none", "standard", "minmax", "robust", "maxabs"
-    encoding_strategy: str = "onehot"             # "onehot", "ordinal", "label", "target", "frequency", "none", "auto"
+    encoding_strategy: str = "none"               # "none", "onehot", "ordinal", "label", "target", "frequency", "auto"
     drop_first: bool = False
-    remove_identifiers: bool = True
+    remove_identifiers: bool = False
     remove_constants: bool = True
+    strip_whitespace: bool = True
+    case_normalization: str = "none"              # "none", "lower", "upper", "title"
+    handle_currency_commas: bool = True
+    preserve_leading_zeros: bool = True
+    parse_dates: bool = False
     target_col: Optional[str] = None
 
 class TrainRequest(BaseModel):
@@ -211,15 +223,25 @@ def clean_data(req: CleanRequest):
         df=raw_df,
         missing_num_strategy=req.missing_num_strategy,
         missing_cat_strategy=req.missing_cat_strategy,
+        missing_cat_fill_value=req.missing_cat_fill_value,
+        convert_empty_to_nan=req.convert_empty_to_nan,
         duplicate_strategy=req.duplicate_strategy,
         duplicate_subset_cols=req.duplicate_subset_cols,
+        duplicate_keep=req.duplicate_keep,
         remove_duplicates=req.remove_duplicates,
         outlier_strategy=req.outlier_strategy,
+        percentile_lower=req.percentile_lower,
+        percentile_upper=req.percentile_upper,
+        strip_whitespace=req.strip_whitespace,
+        case_normalization=req.case_normalization,
+        handle_currency_commas=req.handle_currency_commas,
+        preserve_leading_zeros=req.preserve_leading_zeros,
+        parse_dates=req.parse_dates,
+        remove_identifiers=req.remove_identifiers,
+        remove_constants=req.remove_constants,
         scaling_strategy=req.scaling_strategy,
         encoding_strategy=req.encoding_strategy,
         drop_first=req.drop_first,
-        remove_identifiers=req.remove_identifiers,
-        remove_constants=req.remove_constants,
         target_col=req.target_col
     )
     
@@ -230,13 +252,17 @@ def clean_data(req: CleanRequest):
     post_understanding = analyze_dataset(cleaned_df)
     post_understanding["filename"] = SESSIONS[req.session_id]["filename"]
     
+    preview_rows = min(15, len(cleaned_df))
+    head_preview = cleaned_df.head(preview_rows).replace({np.nan: None}).to_dict(orient="records")
+    
     return {
         "report": report,
-        "understanding": post_understanding
+        "understanding": post_understanding,
+        "head_preview": head_preview
     }
 
 @app.get("/api/download_cleaned/{session_id}")
-def download_cleaned_dataset(session_id: str):
+def download_cleaned_dataset(session_id: str, format: str = "csv"):
     if session_id not in SESSIONS:
         raise HTTPException(status_code=404, detail="Session not found. Please upload a dataset first.")
     
@@ -249,17 +275,32 @@ def download_cleaned_dataset(session_id: str):
     
     raw_filename = SESSIONS[session_id].get("filename") or "dataset"
     base_name = os.path.splitext(raw_filename)[0].replace(" ", "_")
-    clean_filename = f"Cleaned_{base_name}.csv"
     
-    csv_bytes = cleaned_df.to_csv(index=False).encode('utf-8')
-    return Response(
-        content=csv_bytes,
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename={clean_filename}",
-            "Access-Control-Expose-Headers": "Content-Disposition"
-        }
-    )
+    fmt = format.lower().strip()
+    if fmt in ["xlsx", "excel"]:
+        clean_filename = f"Cleaned_{base_name}.xlsx"
+        bio = io.BytesIO()
+        cleaned_df.to_excel(bio, index=False, engine="openpyxl")
+        bio.seek(0)
+        return Response(
+            content=bio.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={clean_filename}",
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        )
+    else:
+        clean_filename = f"Cleaned_{base_name}.csv"
+        csv_bytes = cleaned_df.to_csv(index=False).encode('utf-8')
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={clean_filename}",
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        )
 
 @app.get("/api/detect_problem/{session_id}")
 def get_problem_detection(session_id: str, target_col: Optional[str] = None):

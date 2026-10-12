@@ -42,9 +42,25 @@ def predict_single_record(
         return {"error": "No trained model pipeline available. Please train models first."}
         
     # Construct single row dataframe with all required features in exact order
+    col_map = {str(k).strip().lower(): k for k in input_data.keys()}
     row_dict = {}
     for feat in feature_names:
-        val = input_data.get(feat, None)
+        feat_clean = str(feat).strip()
+        feat_lower = feat_clean.lower()
+        val = None
+        
+        if feat in input_data:
+            val = input_data[feat]
+        elif feat_lower in col_map:
+            val = input_data[col_map[feat_lower]]
+        else:
+            # Check dummy one-hot column
+            for orig_key, orig_val in input_data.items():
+                if feat_clean.startswith(f"{orig_key}_"):
+                    expected_val = feat_clean[len(orig_key) + 1:]
+                    val = 1.0 if str(orig_val).strip().lower() == expected_val.lower() else 0.0
+                    break
+
         if val is not None and str(val).strip() != "":
             try:
                 row_dict[feat] = float(val)
@@ -72,7 +88,7 @@ def predict_single_record(
             if hasattr(pipeline, "predict_proba"):
                 try:
                     probas = pipeline.predict_proba(df_single)[0]
-                    classifier = pipeline.named_steps.get('model')
+                    classifier = getattr(pipeline, "named_steps", {}).get('model')
                     
                     if classifier is not None and hasattr(classifier, "classes_") and label_encoder is not None:
                         for idx, p in enumerate(probas):
@@ -123,11 +139,22 @@ def predict_dataframe(
         raise ValueError("Uploaded dataset is empty.")
 
     out_df = df.copy()
-    
-    # 1. Normalize column lookup for case-insensitivity & whitespace
     col_map = {str(c).strip().lower(): c for c in df.columns}
-    df_features = pd.DataFrame(index=df.index)
     
+    # Check for missing columns
+    missing_cols = []
+    for feat in feature_names:
+        feat_clean = str(feat).strip()
+        feat_lower = feat_clean.lower()
+        if feat_clean not in df.columns and feat_lower not in col_map:
+            has_dummy_parent = any(feat_clean.startswith(f"{orig_col}_") for orig_col in df.columns)
+            if not has_dummy_parent:
+                missing_cols.append(feat)
+
+    if missing_cols:
+        raise ValueError(f"Missing required feature columns in batch CSV: {', '.join(missing_cols)}")
+
+    df_features = pd.DataFrame(index=df.index)
     for feat in feature_names:
         feat_clean = str(feat).strip()
         feat_lower = feat_clean.lower()
@@ -137,21 +164,14 @@ def predict_dataframe(
         elif feat_lower in col_map:
             df_features[feat_clean] = df[col_map[feat_lower]]
         else:
-            # Check if this is a one-hot dummy column (prefix_category)
-            matched = False
             for orig_col in df.columns:
                 if feat_clean.startswith(f"{orig_col}_"):
                     val = feat_clean[len(orig_col) + 1:]
                     df_features[feat_clean] = (df[orig_col].astype(str) == val).astype(int)
-                    matched = True
                     break
-            if not matched:
-                df_features[feat_clean] = np.nan
 
-    # 2. Strict feature ordering
     df_features = df_features[feature_names].copy()
 
-    # 3. Run predictions through fitted pipeline
     try:
         preds = pipeline.predict(df_features)
     except Exception as e:
@@ -162,7 +182,6 @@ def predict_dataframe(
                 pass
         preds = pipeline.predict(df_features)
 
-    # 4. Inverse transform labels for classification
     pred_col_name = f"Predicted_{target_col if target_col else 'Label'}"
     if problem_type == "classification" and label_encoder is not None:
         try:
@@ -172,12 +191,20 @@ def predict_dataframe(
     else:
         out_df[pred_col_name] = preds
 
-    # 5. Probabilities & confidence
     if problem_type == "classification" and hasattr(pipeline, "predict_proba"):
         try:
             probas = pipeline.predict_proba(df_features)
             max_probas = np.max(probas, axis=1)
-            out_df["Prediction_Confidence"] = [f"{round(float(p) * 100, 2)}%" for p in max_probas]
+            out_df["Prediction_Probability"] = [f"{round(float(p) * 100, 2)}%" for p in max_probas]
+            out_df["Prediction_Confidence"] = out_df["Prediction_Probability"]
+            
+            classifier = getattr(pipeline, "named_steps", {}).get('model')
+            if classifier is not None and hasattr(classifier, "classes_") and label_encoder is not None:
+                for idx, cls_val in enumerate(classifier.classes_):
+                    c_name = str(label_encoder.inverse_transform([cls_val])[0])
+                    out_df[f"Prob_{c_name}"] = [f"{round(float(p) * 100, 2)}%" for p in probas[:, idx]]
+        except Exception as e:
+            print(f"Batch probabilities warning: {e}")
             
             classifier = getattr(pipeline, "named_steps", {}).get('model')
             if classifier is not None and hasattr(classifier, "classes_") and label_encoder is not None:

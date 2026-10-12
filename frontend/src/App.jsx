@@ -49,6 +49,44 @@ const BACKEND_URL = (rawBackendUrl && !rawBackendUrl.startsWith('http://') && !r
   ? `https://${rawBackendUrl}`
   : rawBackendUrl;
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 rounded-3xl bg-white border border-[#fca5a5] shadow-sm max-w-xl mx-auto my-12 text-center space-y-4 animate-slide-up">
+          <div className="w-12 h-12 rounded-2xl bg-[#fee2e2] text-[#991b1b] flex items-center justify-center mx-auto text-xl font-black">
+            ⚠️
+          </div>
+          <h3 className="text-lg font-black text-[#1c1917]">Something went wrong in this section</h3>
+          <p className="text-xs text-[#78716c] font-bold">
+            {this.state.error?.message || "An unexpected error occurred while rendering this step."}
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              if (this.props.onReset) this.props.onReset();
+            }}
+            className="btn-primary py-2.5 px-6 text-xs font-black cursor-pointer inline-flex items-center gap-2"
+          >
+            🔄 Return to Dataset Overview
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const GEMINI_MODELS = [
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Fast & Balanced)' },
   { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash (Recommended)' },
@@ -603,7 +641,7 @@ export default function App() {
                     onCancel={() => setShowLoginPage(false)}
                   />
                 ) : (
-                  <>
+                  <ErrorBoundary key={activeStep} onReset={() => setActiveStep(0)}>
                     {activeStep === 0 && (
                       <UploadStep 
                         onUploadSuccess={handleUploadSuccess} 
@@ -670,7 +708,7 @@ export default function App() {
                         lastPrediction={lastPrediction}
                       />
                     )}
-                  </>
+                  </ErrorBoundary>
                 )}
               </div>
 

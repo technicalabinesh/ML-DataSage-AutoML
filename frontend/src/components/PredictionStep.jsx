@@ -14,6 +14,44 @@ export default function PredictionStep({ sessionId, datasetColumns = [], targetC
   const [currentDatasetLoading, setCurrentDatasetLoading] = useState(false);
   const [cleanedLoading, setCleanedLoading] = useState(false);
 
+  const featureCols = (datasetColumns || []).filter(c => c && c.name && c.name !== targetCol);
+
+  useEffect(() => {
+    // Initialize default median/sample values
+    const defaults = {};
+    featureCols.forEach((c) => {
+      if (c.type === 'numerical') {
+        defaults[c.name] = c.stats?.median ?? c.stats?.mean ?? 0;
+      } else {
+        defaults[c.name] = c.stats?.top_category ?? c.sample_values?.[0] ?? '';
+      }
+    });
+    setFormValues(defaults);
+  }, [datasetColumns, targetCol]);
+
+  const handleInputChange = (colName, val) => {
+    setFormValues(prev => ({ ...prev, [colName]: val }));
+  };
+
+  const handlePredictSingle = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axios.post(`${backendUrl}/api/predict`, {
+        session_id: sessionId,
+        features: formValues
+      });
+      setPredictionResult(res.data);
+      if (onPredictionMade) onPredictionMade(res.data);
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || "Prediction request failed. Ensure a model is trained first.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const triggerDownload = (blobData, filename) => {
     const blob = new Blob([blobData], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
@@ -164,7 +202,12 @@ export default function PredictionStep({ sessionId, datasetColumns = [], targetC
 
           <form onSubmit={handlePredictSingle} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[420px] overflow-y-auto pr-2">
-              {featureCols.map((c) => (
+              {featureCols.length === 0 ? (
+                <div className="col-span-full py-8 text-center text-xs text-[#78716c] font-bold">
+                  No feature columns detected. Please upload a dataset and train a model first.
+                </div>
+              ) : (
+                featureCols.map((c) => (
                 <div key={c.name} className="space-y-1">
                   <label className="text-xs font-black text-[#1c1917] block truncate">
                     {c.name} <span className="text-[10px] text-[#78716c] font-bold">({c.type})</span>
@@ -186,7 +229,7 @@ export default function PredictionStep({ sessionId, datasetColumns = [], targetC
                     />
                   )}
                 </div>
-              ))}
+              )))}
             </div>
 
             <div className="pt-4 border-t border-[#e8dfd2] flex justify-end">
