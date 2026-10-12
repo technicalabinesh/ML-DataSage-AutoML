@@ -43,6 +43,7 @@ import TrainingStep from './components/TrainingStep';
 import PredictionStep from './components/PredictionStep';
 import AIChatStep from './components/AIChatStep';
 import LoginPage from './components/LoginPage';
+import GeminiAdvisorBanner from './components/GeminiAdvisorBanner';
 
 const rawBackendUrl = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000';
 const BACKEND_URL = (rawBackendUrl && !rawBackendUrl.startsWith('http://') && !rawBackendUrl.startsWith('https://'))
@@ -642,6 +643,24 @@ export default function App() {
                   />
                 ) : (
                   <ErrorBoundary key={activeStep} onReset={() => setActiveStep(0)}>
+                    {activeStep > 0 && activeStep < 7 && (
+                      <div className="mb-4">
+                        <GeminiAdvisorBanner
+                          sessionId={sessionId}
+                          step={
+                            activeStep === 1 ? 'profiling' :
+                            activeStep === 2 ? 'cleaning' :
+                            activeStep === 3 ? 'target' :
+                            activeStep === 4 ? 'training' :
+                            activeStep === 6 ? 'prediction' : 'general'
+                          }
+                          backendUrl={BACKEND_URL}
+                          geminiModel={selectedModel}
+                          apiKey={apiKey}
+                        />
+                      </div>
+                    )}
+
                     {activeStep === 0 && (
                       <UploadStep 
                         onUploadSuccess={handleUploadSuccess} 

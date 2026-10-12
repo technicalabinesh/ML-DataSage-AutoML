@@ -30,7 +30,7 @@ from backend.prediction_engine import (
     save_pipeline_to_disk, 
     load_pipeline_from_disk
 )
-from backend.ai_analyst import query_ai_analyst, ai_select_models_from_header
+from backend.ai_analyst import query_ai_analyst, ai_select_models_from_header, generate_step_insight
 
 app = FastAPI(title="ML DataSage AI API", version="2.0")
 
@@ -89,6 +89,12 @@ class PredictRequest(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+    gemini_model: str = "gemini-2.5-flash"
+    api_key: Optional[str] = None
+
+class StepInsightRequest(BaseModel):
+    session_id: str
+    step: str
     gemini_model: str = "gemini-2.5-flash"
     api_key: Optional[str] = None
 
@@ -331,61 +337,69 @@ def train_models(req: TrainRequest):
     if req.session_id not in SESSIONS or SESSIONS[req.session_id]["cleaned_df"] is None:
         raise HTTPException(status_code=404, detail="Session or dataset not found")
         
-    df = SESSIONS[req.session_id]["cleaned_df"]
-    detection = detect_problem(df, target_col=req.target_col)
-    
-    target = req.target_col or detection.get("suggested_target")
-    prob_type = req.problem_type or detection.get("problem_type")
-    
-    results = train_and_evaluate(
-        df=df,
-        target_col=target,
-        problem_type=prob_type,
-        scaling_strategy=req.scaling_strategy,
-        selected_models=req.selected_models,
-        fast_mode=req.fast_mode,
-        metric_strategy=req.metric_strategy
-    )
-    
-    # Cache trained models & pipeline in session
-    SESSIONS[req.session_id]["trained_models"] = results.get("trained_pipelines", {})
-    best_name = results.get("best_model_name")
-    best_pipe = results.get("trained_pipelines", {}).get(best_name)
-    
-    SESSIONS[req.session_id]["best_model_name"] = best_name
-    SESSIONS[req.session_id]["pipeline"] = best_pipe
-    SESSIONS[req.session_id]["label_encoder"] = results.get("label_encoder")
-    SESSIONS[req.session_id]["feature_names"] = results.get("feature_names", [])
-    SESSIONS[req.session_id]["target_col"] = target
-    SESSIONS[req.session_id]["problem_type"] = prob_type
-    SESSIONS[req.session_id]["best_model_metrics"] = results.get("best_metrics", {})
-    SESSIONS[req.session_id]["feature_importances"] = results.get("feature_importances", [])
-    
-    # Persist pipeline to disk
-    if best_pipe is not None:
-        save_pipeline_to_disk(
-            session_id=req.session_id,
-            pipeline=best_pipe,
-            label_encoder=results.get("label_encoder"),
-            metadata={
-                "target_col": target,
-                "problem_type": prob_type,
-                "best_model_name": best_name,
-                "feature_names": results.get("feature_names", []),
-                "best_metrics": results.get("best_metrics", {})
-            }
+    try:
+        df = SESSIONS[req.session_id]["cleaned_df"]
+        detection = detect_problem(df, target_col=req.target_col)
+        
+        target = req.target_col or detection.get("suggested_target")
+        prob_type = req.problem_type or detection.get("problem_type")
+        
+        results = train_and_evaluate(
+            df=df,
+            target_col=target,
+            problem_type=prob_type,
+            scaling_strategy=req.scaling_strategy,
+            selected_models=req.selected_models,
+            fast_mode=req.fast_mode,
+            metric_strategy=req.metric_strategy
         )
-    
-    # Return serializable summary without pipeline objects
-    return {
-        "problem_type": results.get("problem_type"),
-        "target_col": results.get("target_col"),
-        "best_model_name": results.get("best_model_name"),
-        "best_metrics": results.get("best_metrics"),
-        "leaderboard": results.get("leaderboard"),
-        "feature_importances": results.get("feature_importances"),
-        "feature_names": results.get("feature_names")
-    }
+        
+        # Cache trained models & pipeline in session
+        SESSIONS[req.session_id]["trained_models"] = results.get("trained_pipelines", {})
+        best_name = results.get("best_model_name")
+        best_pipe = results.get("trained_pipelines", {}).get(best_name)
+        
+        SESSIONS[req.session_id]["best_model_name"] = best_name
+        SESSIONS[req.session_id]["pipeline"] = best_pipe
+        SESSIONS[req.session_id]["label_encoder"] = results.get("label_encoder")
+        SESSIONS[req.session_id]["feature_names"] = results.get("feature_names", [])
+        SESSIONS[req.session_id]["target_col"] = target
+        SESSIONS[req.session_id]["problem_type"] = prob_type
+        SESSIONS[req.session_id]["best_model_metrics"] = results.get("best_metrics", {})
+        SESSIONS[req.session_id]["feature_importances"] = results.get("feature_importances", [])
+        
+        # Persist pipeline to disk
+        if best_pipe is not None:
+            save_pipeline_to_disk(
+                session_id=req.session_id,
+                pipeline=best_pipe,
+                label_encoder=results.get("label_encoder"),
+                metadata={
+                    "target_col": target,
+                    "problem_type": prob_type,
+                    "best_model_name": best_name,
+                    "feature_names": results.get("feature_names", []),
+                    "best_metrics": results.get("best_metrics", {})
+                }
+            )
+        
+        import gc
+        gc.collect()
+        
+        # Return serializable summary without pipeline objects
+        return {
+            "problem_type": results.get("problem_type"),
+            "target_col": results.get("target_col"),
+            "best_model_name": results.get("best_model_name"),
+            "best_metrics": results.get("best_metrics"),
+            "leaderboard": results.get("leaderboard"),
+            "feature_importances": results.get("feature_importances"),
+            "feature_names": results.get("feature_names")
+        }
+    except Exception as e:
+        import gc
+        gc.collect()
+        raise HTTPException(status_code=400, detail=f"Model training error: {str(e)}")
 
 @app.post("/api/predict")
 def predict_record(req: PredictRequest):
@@ -555,3 +569,38 @@ def chat_ai(req: ChatRequest):
     )
     
     return response
+
+@app.post("/api/gemini_step_insight")
+def get_step_insight(req: StepInsightRequest):
+    if req.session_id not in SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    sess = SESSIONS[req.session_id]
+    df = sess.get("cleaned_df") if sess.get("cleaned_df") is not None else sess.get("raw_df")
+    
+    if df is None:
+        summary = {"filename": "No dataset loaded", "total_rows": 0, "total_cols": 0, "health_score": 0}
+    else:
+        summary = analyze_dataset(df)
+        summary["filename"] = sess.get("filename", "Dataset")
+
+    problem_info = sess.get("problem_info") or (detect_problem(df, target_col=sess.get("target_col")) if df is not None else {})
+    cleaning_report = sess.get("cleaning_report") or {}
+    ml_results = {
+        "best_model_name": sess.get("best_model_name", "N/A"),
+        "best_metrics": sess.get("best_model_metrics", {}),
+        "target_col": sess.get("target_col"),
+        "problem_type": sess.get("problem_type")
+    }
+
+    insight = generate_step_insight(
+        step=req.step,
+        dataset_summary=summary,
+        problem_info=problem_info,
+        cleaning_report=cleaning_report,
+        ml_results=ml_results,
+        gemini_model=req.gemini_model,
+        api_key=req.api_key
+    )
+
+    return insight

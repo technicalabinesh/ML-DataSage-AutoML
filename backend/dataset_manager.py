@@ -1,5 +1,6 @@
 import os
 import io
+import gc
 import uuid
 import pandas as pd
 from typing import Dict, Any, Optional, List, Tuple
@@ -7,11 +8,33 @@ from typing import Dict, Any, Optional, List, Tuple
 # Global session cache for uploaded & processed datasets
 # Key: session_id, Value: dict of dataframes and models
 SESSIONS: Dict[str, Dict[str, Any]] = {}
+MAX_ACTIVE_SESSIONS = 2
+
+def _downcast_memory(df: pd.DataFrame) -> pd.DataFrame:
+    """Downcasts float64 to float32 and int64 to int32/int16 to reduce memory footprint by 50-70%."""
+    try:
+        for col in df.select_dtypes(include=['float64']).columns:
+            df[col] = df[col].astype('float32')
+        for col in df.select_dtypes(include=['int64']).columns:
+            c_min, c_max = df[col].min(), df[col].max()
+            if c_min >= -2147483648 and c_max <= 2147483647:
+                df[col] = df[col].astype('int32')
+    except Exception:
+        pass
+    return df
+
+def _evict_old_sessions():
+    """Limits in-memory active sessions to prevent 512MB RAM exhaustion on Render."""
+    while len(SESSIONS) > MAX_ACTIVE_SESSIONS:
+        oldest_key = next(iter(SESSIONS))
+        del SESSIONS[oldest_key]
+    gc.collect()
 
 def get_or_create_session(session_id: Optional[str] = None) -> str:
     if not session_id:
         session_id = str(uuid.uuid4())
     if session_id not in SESSIONS:
+        _evict_old_sessions()
         SESSIONS[session_id] = {
             "raw_df": None,
             "cleaned_df": None,
@@ -34,27 +57,29 @@ def get_or_create_session(session_id: Optional[str] = None) -> str:
 def _parse_file(file_content: bytes, filename: str) -> pd.DataFrame:
     ext = os.path.splitext(filename)[1].lower()
     if ext == '.csv':
-        return pd.read_csv(io.BytesIO(file_content))
+        df = pd.read_csv(io.BytesIO(file_content))
     elif ext in ['.xlsx', '.xls']:
-        return pd.read_excel(io.BytesIO(file_content))
+        df = pd.read_excel(io.BytesIO(file_content))
     else:
         raise ValueError(f"Unsupported file format for '{filename}'. Please upload CSV or XLSX.")
+    return _downcast_memory(df)
 
 def load_file(file_content: bytes, filename: str, session_id: str) -> pd.DataFrame:
     session_id = get_or_create_session(session_id)
     df = _parse_file(file_content, filename)
     
-    # Store in session
-    SESSIONS[session_id]["raw_df"] = df.copy()
+    # Store in session (memory optimized)
+    SESSIONS[session_id]["raw_df"] = df
     SESSIONS[session_id]["cleaned_df"] = df.copy()
     SESSIONS[session_id]["filename"] = filename
-    SESSIONS[session_id]["datasets"][filename] = df.copy()
+    SESSIONS[session_id]["datasets"] = {filename: df}
     
     # Reset downstream steps
     SESSIONS[session_id]["trained_models"] = {}
     SESSIONS[session_id]["pipeline"] = None
     SESSIONS[session_id]["cleaning_report"] = {}
     SESSIONS[session_id]["problem_info"] = {}
+    gc.collect()
     
     return df
 
@@ -167,16 +192,17 @@ def load_sample_dataset(sample_name: str, session_id: str) -> pd.DataFrame:
         from backend.sample_data.generator import generate_samples
         generate_samples(os.path.join(base_dir, "sample_data"))
         
-    df = pd.read_csv(sample_path)
+    df = _downcast_memory(df)
     
     filename = f"{sample_name}.csv"
-    SESSIONS[session_id]["raw_df"] = df.copy()
+    SESSIONS[session_id]["raw_df"] = df
     SESSIONS[session_id]["cleaned_df"] = df.copy()
     SESSIONS[session_id]["filename"] = filename
-    SESSIONS[session_id]["datasets"][filename] = df.copy()
+    SESSIONS[session_id]["datasets"] = {filename: df}
     SESSIONS[session_id]["trained_models"] = {}
     SESSIONS[session_id]["pipeline"] = None
     SESSIONS[session_id]["cleaning_report"] = {}
     SESSIONS[session_id]["problem_info"] = {}
+    gc.collect()
     
     return df
