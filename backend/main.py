@@ -24,6 +24,7 @@ from backend.ml_engine import train_and_evaluate
 from backend.prediction_engine import (
     predict_single_record, 
     predict_batch_csv, 
+    predict_dataframe,
     save_pipeline_to_disk, 
     load_pipeline_from_disk
 )
@@ -236,10 +237,16 @@ def clean_data(req: CleanRequest):
 
 @app.get("/api/download_cleaned/{session_id}")
 def download_cleaned_dataset(session_id: str):
-    if session_id not in SESSIONS or SESSIONS[session_id].get("cleaned_df") is None:
-        raise HTTPException(status_code=404, detail="No cleaned dataset found. Please run data cleaning first.")
+    if session_id not in SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found. Please upload a dataset first.")
     
-    cleaned_df = SESSIONS[session_id]["cleaned_df"]
+    cleaned_df = SESSIONS[session_id].get("cleaned_df")
+    if cleaned_df is None:
+        cleaned_df = SESSIONS[session_id].get("raw_df")
+        
+    if cleaned_df is None or cleaned_df.empty:
+        raise HTTPException(status_code=404, detail="No dataset found for this session. Please upload a dataset first.")
+    
     raw_filename = SESSIONS[session_id].get("filename") or "dataset"
     base_name = os.path.splitext(raw_filename)[0].replace(" ", "_")
     clean_filename = f"Cleaned_{base_name}.csv"
@@ -411,7 +418,59 @@ async def predict_batch(
         return Response(
             content=csv_out,
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=Predicted_{file.filename}.csv"}
+            headers={
+                "Content-Disposition": f"attachment; filename=Predicted_{file.filename}",
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/predict_current_dataset/{session_id}")
+def predict_current_dataset(session_id: str):
+    session_id = get_or_create_session(session_id)
+    sess = SESSIONS[session_id]
+    
+    pipeline = sess.get("pipeline")
+    if not pipeline:
+        saved = load_pipeline_from_disk(session_id)
+        if saved:
+            sess["pipeline"] = saved.get("pipeline")
+            sess["label_encoder"] = saved.get("label_encoder")
+            meta = saved.get("metadata", {})
+            sess["target_col"] = meta.get("target_col")
+            sess["problem_type"] = meta.get("problem_type")
+            sess["feature_names"] = meta.get("feature_names", [])
+            pipeline = sess["pipeline"]
+
+    if not pipeline:
+        raise HTTPException(status_code=400, detail="No trained model available. Train models in Step 4/5 first.")
+
+    target_df = sess.get("cleaned_df") if sess.get("cleaned_df") is not None else sess.get("raw_df")
+    if target_df is None or target_df.empty:
+        raise HTTPException(status_code=400, detail="No dataset loaded in current session.")
+        
+    try:
+        csv_bytes = predict_dataframe(
+            df=target_df,
+            pipeline=pipeline,
+            label_encoder=sess.get("label_encoder"),
+            problem_type=sess.get("problem_type"),
+            target_col=sess.get("target_col"),
+            feature_names=sess.get("feature_names", [])
+        )
+        
+        filename = sess.get("filename") or "dataset"
+        base_name = os.path.splitext(filename)[0].replace(" ", "_")
+        pred_filename = f"Predicted_{base_name}.csv"
+        
+        return Response(
+            content=csv_bytes,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={pred_filename}",
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

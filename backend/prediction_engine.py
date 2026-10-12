@@ -111,55 +111,75 @@ def predict_single_record(
     except Exception as e:
         return {"error": f"Prediction failed: {str(e)}"}
 
-def predict_batch_csv(
-    file_bytes: bytes,
-    filename: str,
+def predict_dataframe(
+    df: pd.DataFrame,
     pipeline: Any,
     label_encoder: Any,
     problem_type: str,
     target_col: str,
     feature_names: list
 ) -> bytes:
-
-    ext = filename.split('.')[-1].lower()
-    if ext == 'csv':
-        df = pd.read_csv(io.BytesIO(file_bytes))
-    else:
-        df = pd.read_excel(io.BytesIO(file_bytes))
-        
     if df.empty:
-        raise ValueError("Uploaded file is empty.")
+        raise ValueError("Uploaded dataset is empty.")
 
-    # Validate feature columns
-    missing_cols = [f for f in feature_names if f not in df.columns]
-    if missing_cols:
-        raise ValueError(f"Missing required feature columns in batch CSV: {', '.join(missing_cols)}")
-        
-    # Prepare feature dataframe strictly in expected column order
-    df_features = df[feature_names].copy()
-    
-    # Execute batch predictions
-    preds = pipeline.predict(df_features)
-    
     out_df = df.copy()
-    pred_col_name = f"Predicted_{target_col if target_col else 'Cluster'}"
     
+    # 1. Normalize column lookup for case-insensitivity & whitespace
+    col_map = {str(c).strip().lower(): c for c in df.columns}
+    df_features = pd.DataFrame(index=df.index)
+    
+    for feat in feature_names:
+        feat_clean = str(feat).strip()
+        feat_lower = feat_clean.lower()
+        
+        if feat_clean in df.columns:
+            df_features[feat_clean] = df[feat_clean]
+        elif feat_lower in col_map:
+            df_features[feat_clean] = df[col_map[feat_lower]]
+        else:
+            # Check if this is a one-hot dummy column (prefix_category)
+            matched = False
+            for orig_col in df.columns:
+                if feat_clean.startswith(f"{orig_col}_"):
+                    val = feat_clean[len(orig_col) + 1:]
+                    df_features[feat_clean] = (df[orig_col].astype(str) == val).astype(int)
+                    matched = True
+                    break
+            if not matched:
+                df_features[feat_clean] = np.nan
+
+    # 2. Strict feature ordering
+    df_features = df_features[feature_names].copy()
+
+    # 3. Run predictions through fitted pipeline
+    try:
+        preds = pipeline.predict(df_features)
+    except Exception as e:
+        for c in df_features.columns:
+            try:
+                df_features[c] = pd.to_numeric(df_features[c])
+            except Exception:
+                pass
+        preds = pipeline.predict(df_features)
+
+    # 4. Inverse transform labels for classification
+    pred_col_name = f"Predicted_{target_col if target_col else 'Label'}"
     if problem_type == "classification" and label_encoder is not None:
         try:
-            out_df[pred_col_name] = label_encoder.inverse_transform(preds.astype(int))
+            out_df[pred_col_name] = label_encoder.inverse_transform(np.asarray(preds).astype(int))
         except Exception:
             out_df[pred_col_name] = preds
     else:
         out_df[pred_col_name] = preds
-        
-    # Append probabilities if classification
+
+    # 5. Probabilities & confidence
     if problem_type == "classification" and hasattr(pipeline, "predict_proba"):
         try:
             probas = pipeline.predict_proba(df_features)
             max_probas = np.max(probas, axis=1)
-            out_df["Prediction_Probability"] = [f"{round(float(p) * 100, 2)}%" for p in max_probas]
+            out_df["Prediction_Confidence"] = [f"{round(float(p) * 100, 2)}%" for p in max_probas]
             
-            classifier = pipeline.named_steps.get('model')
+            classifier = getattr(pipeline, "named_steps", {}).get('model')
             if classifier is not None and hasattr(classifier, "classes_") and label_encoder is not None:
                 for idx, cls_val in enumerate(classifier.classes_):
                     c_name = str(label_encoder.inverse_transform([cls_val])[0])
@@ -170,3 +190,27 @@ def predict_batch_csv(
     output = io.BytesIO()
     out_df.to_csv(output, index=False)
     return output.getvalue()
+
+def predict_batch_csv(
+    file_bytes: bytes,
+    filename: str,
+    pipeline: Any,
+    label_encoder: Any,
+    problem_type: str,
+    target_col: str,
+    feature_names: list
+) -> bytes:
+    ext = filename.split('.')[-1].lower()
+    if ext == 'csv':
+        df = pd.read_csv(io.BytesIO(file_bytes))
+    else:
+        df = pd.read_excel(io.BytesIO(file_bytes))
+        
+    return predict_dataframe(
+        df=df,
+        pipeline=pipeline,
+        label_encoder=label_encoder,
+        problem_type=problem_type,
+        target_col=target_col,
+        feature_names=feature_names
+    )

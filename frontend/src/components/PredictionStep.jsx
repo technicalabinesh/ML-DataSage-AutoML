@@ -8,50 +8,41 @@ export default function PredictionStep({ sessionId, datasetColumns = [], targetC
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Batch prediction state
+  // Batch & Dataset prediction states
   const [batchFile, setBatchFile] = useState(null);
   const [batchLoading, setBatchLoading] = useState(false);
+  const [currentDatasetLoading, setCurrentDatasetLoading] = useState(false);
+  const [cleanedLoading, setCleanedLoading] = useState(false);
 
-  const featureCols = datasetColumns.filter(c => c.name !== targetCol);
-
-  useEffect(() => {
-    // Initialize default median/sample values
-    const defaults = {};
-    featureCols.forEach((c) => {
-      if (c.type === 'numerical') {
-        defaults[c.name] = c.stats?.median ?? c.stats?.mean ?? 0;
-      } else {
-        defaults[c.name] = c.stats?.top_category ?? c.sample_values?.[0] ?? '';
-      }
-    });
-    setFormValues(defaults);
-  }, [datasetColumns, targetCol]);
-
-  const handleInputChange = (colName, val) => {
-    setFormValues(prev => ({ ...prev, [colName]: val }));
+  const triggerDownload = (blobData, filename) => {
+    const blob = new Blob([blobData], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.setAttribute('download', filename);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   };
 
-  const handlePredictSingle = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await axios.post(`${backendUrl}/api/predict`, {
-        session_id: sessionId,
-        features: formValues
-      });
-      setPredictionResult(res.data);
-      if (onPredictionMade) onPredictionMade(res.data);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Prediction request failed.");
-    } finally {
-      setLoading(false);
+  const parseBlobError = async (err, defaultMsg) => {
+    if (err.response?.data instanceof Blob) {
+      try {
+        const text = await err.response.data.text();
+        const json = JSON.parse(text);
+        return json.detail || json.error || text;
+      } catch {
+        return defaultMsg;
+      }
     }
+    return err.response?.data?.detail || defaultMsg;
   };
 
   const handleBatchPredict = async () => {
     if (!batchFile) return;
     setBatchLoading(true);
+    setError(null);
     const formData = new FormData();
     formData.append('session_id', sessionId);
     formData.append('file', batchFile);
@@ -60,18 +51,59 @@ export default function PredictionStep({ sessionId, datasetColumns = [], targetC
       const res = await axios.post(`${backendUrl}/api/predict_batch`, formData, {
         responseType: 'blob'
       });
-      
-      const blob = new Blob([res.data], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Predicted_${batchFile.name}`;
-      a.click();
+      triggerDownload(res.data, `Predicted_${batchFile.name}`);
     } catch (err) {
-      setError("Batch prediction failed. Check CSV format.");
+      const msg = await parseBlobError(err, "Batch prediction failed. Check CSV column names.");
+      setError(msg);
     } finally {
       setBatchLoading(false);
     }
+  };
+
+  const handlePredictCurrentDataset = async () => {
+    setCurrentDatasetLoading(true);
+    setError(null);
+    try {
+      const res = await axios.get(`${backendUrl}/api/predict_current_dataset/${sessionId}`, {
+        responseType: 'blob'
+      });
+      triggerDownload(res.data, `Predicted_Current_Dataset.csv`);
+    } catch (err) {
+      const msg = await parseBlobError(err, "Failed to generate predictions for current dataset. Train model first.");
+      setError(msg);
+    } finally {
+      setCurrentDatasetLoading(false);
+    }
+  };
+
+  const handleDownloadCleaned = async () => {
+    setCleanedLoading(true);
+    setError(null);
+    try {
+      const res = await axios.get(`${backendUrl}/api/download_cleaned/${sessionId}`, {
+        responseType: 'blob'
+      });
+      triggerDownload(res.data, `Cleaned_Dataset.csv`);
+    } catch (err) {
+      const msg = await parseBlobError(err, "Failed to download cleaned dataset.");
+      setError(msg);
+    } finally {
+      setCleanedLoading(false);
+    }
+  };
+
+  const handleDownloadSinglePrediction = () => {
+    if (!predictionResult) return;
+    const summary = predictionResult.input_summary || formValues;
+    const row = {
+      ...summary,
+      [`Predicted_${targetCol || 'Target'}`]: predictionResult.prediction,
+      Model_Confidence: `${predictionResult.confidence}%`
+    };
+    const headers = Object.keys(row).join(',');
+    const values = Object.values(row).map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
+    const csvContent = `${headers}\n${values}`;
+    triggerDownload(csvContent, `Single_Prediction_${targetCol || 'Result'}.csv`);
   };
 
   return (
@@ -86,10 +118,39 @@ export default function PredictionStep({ sessionId, datasetColumns = [], targetC
             6. Interactive Prediction Interface & Batch Inference
           </h2>
           <p className="text-xs font-bold text-[#57534e] mt-1">
-            Enter custom feature values for single record prediction or run batch CSV inference.
+            Predict single records interactively or download batch predictions on test CSVs.
           </p>
         </div>
+
+        {/* Global Action Download Pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleDownloadCleaned}
+            disabled={cleanedLoading}
+            className="bg-white hover:bg-[#f6eee3] text-[#1c1917] border border-[#e8dfd2] text-xs font-black py-2 px-3.5 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+            title="Download Cleaned Preprocessed CSV"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{cleanedLoading ? 'Downloading...' : 'Download Cleaned CSV'}</span>
+          </button>
+
+          <button
+            onClick={handlePredictCurrentDataset}
+            disabled={currentDatasetLoading}
+            className="bg-[#1c1917] hover:bg-black text-white text-xs font-black py-2 px-3.5 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+            title="Download current dataset with predictions appended"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>{currentDatasetLoading ? 'Scoring...' : 'Download Current Dataset Predictions'}</span>
+          </button>
+        </div>
       </div>
+
+      {error && (
+        <div className="p-4 rounded-2xl bg-[#fee2e2] border border-[#fca5a5] text-[#991b1b] text-xs text-center font-black animate-slide-up">
+          ⚠️ {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Input Form Column */}
@@ -192,6 +253,16 @@ export default function PredictionStep({ sessionId, datasetColumns = [], targetC
                     ))}
                   </div>
                 )}
+
+                {/* Single Prediction CSV Export Button */}
+                <button
+                  type="button"
+                  onClick={handleDownloadSinglePrediction}
+                  className="w-full bg-[#f6eee3] hover:bg-[#ece4d8] text-[#1c1917] border border-[#e8dfd2] text-xs font-black py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 transition-all mt-2"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Download This Prediction (CSV)</span>
+                </button>
               </div>
             ) : (
               <div className="py-12 text-center text-xs text-[#78716c] font-bold">
@@ -201,28 +272,71 @@ export default function PredictionStep({ sessionId, datasetColumns = [], targetC
           </div>
 
           {/* Batch CSV Prediction Card */}
-          <div className="bg-white p-6 rounded-3xl space-y-3 border border-[#e8dfd2] shadow-sm">
-            <h4 className="text-xs font-black text-[#1c1917] uppercase tracking-wider flex items-center gap-2">
-              <Download className="w-4 h-4 text-emerald-600" />
-              Batch CSV Inference Download
-            </h4>
-            <p className="text-[11px] text-[#57534e] font-bold">
-              Upload un-labeled CSV file to automatically append predicted outputs.
+          <div className="bg-white p-6 rounded-3xl space-y-3.5 border border-[#e8dfd2] shadow-sm">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black text-[#1c1917] uppercase tracking-wider flex items-center gap-2">
+                <Download className="w-4 h-4 text-emerald-600" />
+                Batch CSV Test Inference
+              </h4>
+              <span className="text-[10px] font-bold bg-[#c8f2da] text-emerald-950 px-2.5 py-0.5 rounded-full">
+                test.csv Ready
+              </span>
+            </div>
+            
+            <p className="text-[11px] text-[#57534e] font-bold leading-relaxed">
+              Upload your test set (e.g. <code>test.csv</code>) without labels to evaluate all rows and automatically export predictions.
             </p>
 
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(e) => e.target.files?.[0] && setBatchFile(e.target.files[0])}
-              className="text-xs text-[#1c1917] file:mr-2 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-[#1c1917] file:text-white cursor-pointer w-full"
-            />
+            <div className="border border-dashed border-[#d6cbbe] rounded-2xl p-3 bg-[#fbf8f3] text-center space-y-1.5">
+              <input
+                type="file"
+                id="batch-csv-input"
+                accept=".csv"
+                onChange={(e) => e.target.files?.[0] && setBatchFile(e.target.files[0])}
+                className="hidden"
+              />
+              <label 
+                htmlFor="batch-csv-input"
+                className="cursor-pointer block text-xs font-black text-[#1c1917] hover:underline"
+              >
+                {batchFile ? (
+                  <span className="text-emerald-700 flex items-center justify-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    {batchFile.name} (Ready to Score)
+                  </span>
+                ) : (
+                  <span>📁 Click to browse or drop test.csv</span>
+                )}
+              </label>
+              <div className="text-[10px] text-[#78716c] font-bold">Supported format: CSV (any row count)</div>
+            </div>
 
             <button
               onClick={handleBatchPredict}
               disabled={!batchFile || batchLoading}
-              className="btn-secondary w-full text-xs py-2.5 justify-center rounded-full cursor-pointer font-black"
+              className="w-full btn-primary text-xs py-3 justify-center rounded-xl cursor-pointer font-black flex items-center gap-2 shadow-sm"
             >
-              {batchLoading ? 'Generating Batch CSV...' : 'Download Predicted CSV'}
+              <Download className="w-3.5 h-3.5" />
+              <span>{batchLoading ? 'Executing Inference...' : 'Download Predicted CSV'}</span>
+            </button>
+          </div>
+
+          {/* Quick One-Click Current Dataset Inference Card */}
+          <div className="bg-[#fbf8f3] p-5 rounded-3xl border border-[#e8dfd2] space-y-2.5 shadow-2xs">
+            <div className="text-xs font-black text-[#1c1917] flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Score Current Dataset</span>
+            </div>
+            <p className="text-[11px] text-[#78716c] font-bold">
+              Want predictions on your currently loaded training dataset? Run full pipeline scoring with 1 click.
+            </p>
+            <button
+              onClick={handlePredictCurrentDataset}
+              disabled={currentDatasetLoading}
+              className="w-full bg-white hover:bg-slate-50 text-[#1c1917] border border-[#d6cbbe] text-xs font-black py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-2xs transition-all"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-600" />
+              <span>{currentDatasetLoading ? 'Scoring...' : 'Download Current Dataset Predictions'}</span>
             </button>
           </div>
         </div>

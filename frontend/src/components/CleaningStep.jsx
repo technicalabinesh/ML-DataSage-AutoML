@@ -114,23 +114,44 @@ export default function CleaningStep({ sessionId, backendUrl, datasetColumns = [
           </p>
         </div>
 
-        <button
-          onClick={handleClean}
-          disabled={loading}
-          className="btn-primary cursor-pointer shadow-md text-xs py-2.5 px-6 font-extrabold flex items-center gap-2"
-        >
-          {loading ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span>Executing Cleaning...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-4 h-4" />
-              <span>Run Auto Data Cleaning</span>
-            </>
-          )}
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={handleDownloadCleaned}
+            disabled={downloading}
+            className="bg-white hover:bg-[#f6eee3] text-[#1c1917] border border-[#e8dfd2] cursor-pointer shadow-xs text-xs py-2.5 px-4 font-black flex items-center gap-2 rounded-xl transition-all"
+            title="Download Cleaned Dataset (CSV)"
+          >
+            {downloading ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                <span>Downloading...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Download Cleaned CSV</span>
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handleClean}
+            disabled={loading}
+            className="btn-primary cursor-pointer shadow-md text-xs py-2.5 px-6 font-extrabold flex items-center gap-2"
+          >
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Executing Cleaning...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                <span>Run Auto Data Cleaning</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Cleaning Config Controls Grid */}
